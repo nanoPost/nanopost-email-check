@@ -20,6 +20,7 @@ class NanoPost_Email_Check_Plugin {
 
 		if ( is_admin() ) {
 			NanoPost_Email_Check_Admin::init();
+			NanoPost_Email_Check_Alerts::init();
 		}
 	}
 

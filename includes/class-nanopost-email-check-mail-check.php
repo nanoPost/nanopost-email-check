@@ -63,10 +63,6 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		$sent = wp_mail( $recipient, $this->subject( $trigger ), $this->message( $trigger, $time ) );
 		remove_action( 'wp_mail_failed', $catch );
 
-		if ( ! $sent && '' === $error ) {
-			$error = __( 'wp_mail() returned false and gave no error message.', 'nanopost-email-check' );
-		}
-
 		return new NanoPost_Email_Check_Result( $this->id(), $trigger, (bool) $sent, $sent ? '' : $error, $recipient, $time );
 	}
 

@@ -37,7 +37,8 @@ class NanoPost_Email_Check_Result {
 	public $passed;
 
 	/**
-	 * Error text when the check failed. Empty when it passed.
+	 * Error text when the check failed. Empty when it passed, or when it failed and no
+	 * error text was given.
 	 *
 	 * @var string
 	 */
@@ -74,6 +75,18 @@ class NanoPost_Email_Check_Result {
 		$this->error     = (string) $error;
 		$this->recipient = (string) $recipient;
 		$this->time      = null === $time ? time() : (int) $time;
+	}
+
+	/**
+	 * Error text to show: the stored text, or a fallback when a failure gave none.
+	 *
+	 * @return string
+	 */
+	public function error_message() {
+		if ( $this->passed || '' !== $this->error ) {
+			return $this->error;
+		}
+		return __( 'wp_mail() returned false and gave no error message.', 'nanopost-email-check' );
 	}
 
 	/**

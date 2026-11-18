@@ -1,6 +1,7 @@
 <?php
 /**
  * Plugin Name:       nanoPost Email Check
+ * Plugin URI:        https://nanopo.st/email-check/
  * Description:       Check that your site can still send email. Sends a scheduled test email, logs each result and warns you when a check fails.
  * Version:           1.0.0
  * Requires at least: 6.4
@@ -27,6 +28,8 @@ require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-log
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-mail-check.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-scheduler.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-plugin.php';
+require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-help.php';
+require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-alerts.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-admin.php';
 
 register_activation_hook( __FILE__, array( 'NanoPost_Email_Check_Scheduler', 'activate' ) );

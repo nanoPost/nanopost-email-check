@@ -162,7 +162,9 @@ class NanoPost_Email_Check_Admin {
 		}
 
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'nanoPost Email Check', 'nanopost-email-check' ) . '</h1>';
+		echo '<h1 class="wp-heading-inline">' . esc_html__( 'nanoPost Email Check', 'nanopost-email-check' ) . '</h1> ';
+		echo self::help_link( NanoPost_Email_Check_Help::home(), __( 'Help', 'nanopost-email-check' ), 'page-title-action' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+		echo '<hr class="wp-header-end">';
 
 		// Screens outside the Settings menu must print these themselves. No argument, so the
 		// "Settings saved." message (stored under "general") shows too.
@@ -208,11 +210,12 @@ class NanoPost_Email_Check_Admin {
 	}
 
 	/**
-	 * Last result and next scheduled run.
+	 * Last result, schedule state and next scheduled run, with help links.
 	 */
 	private static function render_status() {
 		$latest = NanoPost_Email_Check_Log::latest();
 		$next   = NanoPost_Email_Check_Scheduler::next_run();
+		$stale  = NanoPost_Email_Check_Alerts::stale_since();
 
 		echo '<h2>' . esc_html__( 'Status', 'nanopost-email-check' ) . '</h2>';
 		echo '<table class="form-table" role="presentation"><tbody>';
@@ -226,12 +229,38 @@ class NanoPost_Email_Check_Admin {
 				wp_kses_post( self::status_badge( $latest->passed ) ),
 				esc_html( self::format_time( $latest->time ) )
 			);
+			if ( $latest->passed ) {
+				echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::pass(), __( 'What a pass means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			} else {
+				echo '<br /><code>' . esc_html( $latest->error_message() ) . '</code> &middot; ';
+				echo self::help_link( NanoPost_Email_Check_Help::for_failure( $latest ), __( 'What this error means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			}
 		}
 		echo '</td></tr>';
 
-		echo '<tr><th scope="row">' . esc_html__( 'Next scheduled check', 'nanopost-email-check' ) . '</th><td>';
-		if ( $next ) {
-			echo esc_html( self::format_time( $next ) );
+		echo '<tr><th scope="row">' . esc_html__( 'Scheduled checks', 'nanopost-email-check' ) . '</th><td>';
+		if ( null !== $stale ) {
+			echo '<strong style="color:#d63638;">' . esc_html__( 'Stopped', 'nanopost-email-check' ) . '</strong> &middot; ';
+			echo esc_html(
+				sprintf(
+					/* translators: %s: date and time. */
+					__( 'A check was due on %s and has not run. WP-Cron may not be running.', 'nanopost-email-check' ),
+					self::format_date( $stale )
+				)
+			);
+			if ( NanoPost_Email_Check_Alerts::wp_cron_disabled() ) {
+				echo '<br />' . esc_html__( 'DISABLE_WP_CRON is set in wp-config.php, so a cron job on the server must run wp-cron.php.', 'nanopost-email-check' );
+			}
+			echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::cron(), __( 'How to fix WP-Cron', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+		} elseif ( $next ) {
+			echo esc_html(
+				sprintf(
+					/* translators: 1: schedule name such as "Daily", 2: date and time. */
+					__( '%1$s. Next check: %2$s', 'nanopost-email-check' ),
+					NanoPost_Email_Check_Settings::intervals()[ NanoPost_Email_Check_Settings::interval() ],
+					self::format_time( $next )
+				)
+			);
 		} else {
 			esc_html_e( 'Not scheduled.', 'nanopost-email-check' );
 		}
@@ -286,7 +315,14 @@ class NanoPost_Email_Check_Admin {
 			echo '<td>' . wp_kses_post( self::status_badge( $result->passed ) ) . '</td>';
 			echo '<td>' . esc_html( NanoPost_Email_Check_Result::TRIGGER_MANUAL === $result->trigger ? __( 'Manual', 'nanopost-email-check' ) : __( 'Schedule', 'nanopost-email-check' ) ) . '</td>';
 			echo '<td>' . esc_html( $result->recipient ) . '</td>';
-			echo '<td>' . ( '' === $result->error ? '&mdash;' : '<code>' . esc_html( $result->error ) . '</code>' ) . '</td>';
+			echo '<td>';
+			if ( $result->passed ) {
+				echo '&mdash;';
+			} else {
+				echo '<code>' . esc_html( $result->error_message() ) . '</code> ';
+				echo self::help_link( NanoPost_Email_Check_Help::for_failure( $result ), __( 'What this means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			}
+			echo '</td>';
 			echo '</tr>';
 		}
 
@@ -306,13 +342,41 @@ class NanoPost_Email_Check_Admin {
 	}
 
 	/**
+	 * Link to a help page on nanopo.st, opened in a new tab.
+	 *
+	 * @param string $url   URL.
+	 * @param string $label Link text.
+	 * @param string $css_class Optional CSS class.
+	 * @return string Escaped HTML.
+	 */
+	private static function help_link( $url, $label, $css_class = '' ) {
+		return sprintf(
+			'<a href="%1$s"%2$s target="_blank" rel="noopener">%3$s<span class="screen-reader-text"> %4$s</span></a>',
+			esc_url( $url ),
+			'' === $css_class ? '' : ' class="' . esc_attr( $css_class ) . '"',
+			esc_html( $label ),
+			esc_html__( '(opens in a new tab)', 'nanopost-email-check' )
+		);
+	}
+
+	/**
+	 * Site-local date and time.
+	 *
+	 * @param int $time Unix time.
+	 * @return string
+	 */
+	public static function format_date( $time ) {
+		return (string) wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $time );
+	}
+
+	/**
 	 * Site-local date and time, plus "x ago" or "in x".
 	 *
 	 * @param int $time Unix time.
 	 * @return string
 	 */
 	private static function format_time( $time ) {
-		$date = wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $time );
+		$date = self::format_date( $time );
 		$diff = human_time_diff( $time, time() );
 
 		return $time <= time()
