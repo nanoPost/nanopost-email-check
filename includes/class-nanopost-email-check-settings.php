@@ -47,7 +47,18 @@ class NanoPost_Email_Check_Settings {
 	 * @return array
 	 */
 	public static function get() {
-		return wp_parse_args( (array) get_option( self::OPTION, array() ), self::defaults() );
+		$stored   = get_option( self::OPTION, array() );
+		$stored   = is_array( $stored ) ? $stored : array();
+		$settings = self::defaults();
+
+		// Keep only known keys, as strings. The option can be changed outside the settings form.
+		foreach ( $settings as $key => $default ) {
+			if ( isset( $stored[ $key ] ) && is_scalar( $stored[ $key ] ) ) {
+				$settings[ $key ] = (string) $stored[ $key ];
+			}
+		}
+
+		return $settings;
 	}
 
 	/**
@@ -103,34 +114,30 @@ class NanoPost_Email_Check_Settings {
 	 * @return array
 	 */
 	public static function sanitize( $input ) {
+		// options.php has already unslashed the input.
 		$input  = is_array( $input ) ? $input : array();
-		$old    = self::get();
-		$output = $old;
+		$output = self::get();
 
-		if ( array_key_exists( 'recipient', $input ) ) {
-			$recipient = sanitize_email( wp_unslash( $input['recipient'] ) );
-			$raw       = trim( (string) wp_unslash( $input['recipient'] ) );
+		if ( isset( $input['recipient'] ) && is_scalar( $input['recipient'] ) ) {
+			$raw       = trim( (string) $input['recipient'] );
+			$recipient = sanitize_email( $raw );
 
 			if ( '' === $raw ) {
 				$output['recipient'] = '';
 			} elseif ( '' !== $recipient && is_email( $recipient ) ) {
 				$output['recipient'] = $recipient;
 			} else {
-				add_settings_error(
-					self::OPTION,
-					'invalid_recipient',
-					__( 'The email address is not valid. The previous address was kept.', 'nanopost-email-check' )
-				);
+				self::error( 'invalid_recipient', __( 'The email address is not valid. The previous address was kept.', 'nanopost-email-check' ) );
 			}
 		}
 
-		if ( array_key_exists( 'interval', $input ) ) {
-			$interval           = sanitize_key( wp_unslash( $input['interval'] ) );
+		if ( isset( $input['interval'] ) && is_scalar( $input['interval'] ) ) {
+			$interval           = sanitize_key( (string) $input['interval'] );
 			$output['interval'] = array_key_exists( $interval, self::intervals() ) ? $interval : 'daily';
 		}
 
-		if ( array_key_exists( 'webhook_url', $input ) ) {
-			$raw = trim( (string) wp_unslash( $input['webhook_url'] ) );
+		if ( isset( $input['webhook_url'] ) && is_scalar( $input['webhook_url'] ) ) {
+			$raw = trim( (string) $input['webhook_url'] );
 			$url = esc_url_raw( $raw, array( 'https', 'http' ) );
 
 			if ( '' === $raw ) {
@@ -138,14 +145,23 @@ class NanoPost_Email_Check_Settings {
 			} elseif ( '' !== $url && wp_http_validate_url( $url ) ) {
 				$output['webhook_url'] = $url;
 			} else {
-				add_settings_error(
-					self::OPTION,
-					'invalid_webhook_url',
-					__( 'The webhook URL is not valid. It must be a public http or https address. The previous URL was kept.', 'nanopost-email-check' )
-				);
+				self::error( 'invalid_webhook_url', __( 'The webhook URL is not valid. It must be a public http or https address on port 80, 443 or 8080. The previous URL was kept.', 'nanopost-email-check' ) );
 			}
 		}
 
 		return $output;
+	}
+
+	/**
+	 * Show a settings error on the plugin screen. The function exists only in wp-admin; the
+	 * option can also be saved from elsewhere, for example WP-CLI.
+	 *
+	 * @param string $code    Error code.
+	 * @param string $message Message.
+	 */
+	private static function error( $code, $message ) {
+		if ( function_exists( 'add_settings_error' ) ) {
+			add_settings_error( self::OPTION, $code, $message );
+		}
 	}
 }

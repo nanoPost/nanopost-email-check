@@ -46,6 +46,21 @@ class NanoPost_Email_Check_Log {
 	}
 
 	/**
+	 * The newest result of each check, newest first.
+	 *
+	 * @return NanoPost_Email_Check_Result[] Keyed by check id.
+	 */
+	public static function latest_per_check() {
+		$latest = array();
+		foreach ( self::all() as $result ) {
+			if ( ! isset( $latest[ $result->check ] ) ) {
+				$latest[ $result->check ] = $result;
+			}
+		}
+		return $latest;
+	}
+
+	/**
 	 * Stored arrays.
 	 *
 	 * @return array

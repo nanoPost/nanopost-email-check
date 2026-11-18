@@ -38,7 +38,15 @@ class NanoPost_Email_Check_Webhook {
 			return;
 		}
 
-		$state    = self::state();
+		$state = self::state();
+
+		// A new URL starts fresh: no recovery message for a failure that went to another URL.
+		$url_hash = md5( $url );
+		if ( $state['url_hash'] !== $url_hash ) {
+			$state['last_status'] = array();
+			$state['url_hash']    = $url_hash;
+		}
+
 		$previous = isset( $state['last_status'][ $result->check ] ) ? $state['last_status'][ $result->check ] : '';
 
 		if ( $result->passed && 'fail' !== $previous ) {
@@ -49,8 +57,12 @@ class NanoPost_Email_Check_Webhook {
 		$status   = $result->passed ? 'pass' : 'fail';
 		$delivery = self::send( $url, self::payload( $result, $url ) );
 
-		$state['last_status'][ $result->check ] = $status;
-		$state['last_delivery']                 = $delivery;
+		// Remember the status only once the receiver has it. A failed recovery message is
+		// sent again on the next pass.
+		if ( $delivery['ok'] ) {
+			$state['last_status'][ $result->check ] = $status;
+		}
+		$state['last_delivery'] = $delivery;
 		update_option( self::STATE_OPTION, $state, false );
 	}
 
@@ -130,7 +142,8 @@ class NanoPost_Email_Check_Webhook {
 	}
 
 	/**
-	 * Stored state: last status sent per check, and the last delivery.
+	 * Stored state: last status delivered per check, the last delivery, and a hash of the URL
+	 * the state belongs to.
 	 *
 	 * @return array
 	 */
@@ -138,12 +151,10 @@ class NanoPost_Email_Check_Webhook {
 		$state = get_option( self::STATE_OPTION, array() );
 		$state = is_array( $state ) ? $state : array();
 
-		return wp_parse_args(
-			$state,
-			array(
-				'last_status'   => array(),
-				'last_delivery' => array(),
-			)
+		return array(
+			'last_status'   => isset( $state['last_status'] ) && is_array( $state['last_status'] ) ? $state['last_status'] : array(),
+			'last_delivery' => isset( $state['last_delivery'] ) && is_array( $state['last_delivery'] ) ? $state['last_delivery'] : array(),
+			'url_hash'      => isset( $state['url_hash'] ) && is_string( $state['url_hash'] ) ? $state['url_hash'] : '',
 		);
 	}
 }

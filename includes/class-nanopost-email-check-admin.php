@@ -63,11 +63,9 @@ class NanoPost_Email_Check_Admin {
 	}
 
 	/**
-	 * Register the setting, section and fields.
+	 * Register the section and fields. The setting itself is registered on init.
 	 */
 	public static function register_settings() {
-		NanoPost_Email_Check_Settings::register();
-
 		add_settings_section( 'nanopost_email_check_main', __( 'Settings', 'nanopost-email-check' ), '__return_false', self::PAGE );
 
 		add_settings_field(

@@ -26,13 +26,18 @@ class NanoPost_Email_Check_Alerts {
 	}
 
 	/**
-	 * The latest result, if it failed.
+	 * The newest failed result among the latest result of each check, or null when every
+	 * check passed last time.
 	 *
 	 * @return NanoPost_Email_Check_Result|null
 	 */
 	public static function failed_result() {
-		$latest = NanoPost_Email_Check_Log::latest();
-		return ( null !== $latest && ! $latest->passed ) ? $latest : null;
+		foreach ( NanoPost_Email_Check_Log::latest_per_check() as $result ) {
+			if ( ! $result->passed ) {
+				return $result;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -50,7 +55,13 @@ class NanoPost_Email_Check_Alerts {
 			return null;
 		}
 
-		$interval = NanoPost_Email_Check_Scheduler::interval_seconds( NanoPost_Email_Check_Settings::interval() );
+		// WP-Cron may have just been started for this page load and not yet run the event.
+		$doing_cron = (float) get_transient( 'doing_cron' );
+		if ( $doing_cron > 0 && time() - $doing_cron < MINUTE_IN_SECONDS ) {
+			return null;
+		}
+
+		$interval = NanoPost_Email_Check_Scheduler::current_interval_seconds();
 		return ( time() - $next > $interval ) ? (int) $next : null;
 	}
 
@@ -98,7 +109,7 @@ class NanoPost_Email_Check_Alerts {
 			return;
 		}
 
-		$dismissed = (array) get_user_meta( get_current_user_id(), self::DISMISSED_META, true );
+		$dismissed = self::dismissed();
 
 		foreach ( self::active() as $key => $type ) {
 			if ( in_array( $key, $dismissed, true ) ) {
@@ -203,6 +214,17 @@ class NanoPost_Email_Check_Alerts {
 	}
 
 	/**
+	 * Alert keys the current user dismissed on this site. Stored per site (user option), so
+	 * on multisite a dismissal on one site does not affect another.
+	 *
+	 * @return string[]
+	 */
+	private static function dismissed() {
+		$dismissed = get_user_option( self::DISMISSED_META, get_current_user_id() );
+		return is_array( $dismissed ) ? array_map( 'strval', $dismissed ) : array();
+	}
+
+	/**
 	 * Dismiss one alert for the current user, then go back.
 	 */
 	public static function handle_dismiss() {
@@ -216,9 +238,9 @@ class NanoPost_Email_Check_Alerts {
 
 		if ( isset( $active[ $key ] ) ) {
 			// Keep only keys of alerts that are still active, plus this one.
-			$dismissed   = array_intersect( (array) get_user_meta( get_current_user_id(), self::DISMISSED_META, true ), array_keys( $active ) );
+			$dismissed   = array_intersect( self::dismissed(), array_keys( $active ) );
 			$dismissed[] = $key;
-			update_user_meta( get_current_user_id(), self::DISMISSED_META, array_values( array_unique( $dismissed ) ) );
+			update_user_option( get_current_user_id(), self::DISMISSED_META, array_values( array_unique( $dismissed ) ) );
 		}
 
 		wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url() );

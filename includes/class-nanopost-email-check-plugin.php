@@ -16,6 +16,7 @@ class NanoPost_Email_Check_Plugin {
 	 * Register hooks. Called once from the main plugin file.
 	 */
 	public static function boot() {
+		add_action( 'init', array( 'NanoPost_Email_Check_Settings', 'register' ) );
 		NanoPost_Email_Check_Scheduler::init();
 		NanoPost_Email_Check_Webhook::init();
 

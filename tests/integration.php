@@ -110,12 +110,13 @@ add_filter(
 			'url'  => $url,
 			'args' => $args,
 		);
+		$code                     = isset( $GLOBALS['np_http_code'] ) ? $GLOBALS['np_http_code'] : 204;
 		return array(
 			'headers'  => array(),
 			'body'     => '',
 			'response' => array(
-				'code'    => 204,
-				'message' => 'No Content',
+				'code'    => $code,
+				'message' => 204 === $code ? 'No Content' : 'Server Error',
 			),
 			'cookies'  => array(),
 		);
@@ -156,6 +157,28 @@ foreach ( array( 'http://127.0.0.1/x', 'http://10.0.0.5/x', 'ftp://example.com/x
 $np = NanoPost_Email_Check_Settings::sanitize( array( 'webhook_url' => 'https://hooks.slack.com/services/T/B/x' ) );
 np_assert( 'https://hooks.slack.com/services/T/B/x' === $np['webhook_url'], 'public https webhook URL accepted', $np );
 
+// Simulate bad stored values (the sanitize callback would stop them on a normal save).
+$np_bad = static function () {
+	return array(
+		'recipient' => array( 'x' ),
+		'interval'  => array( 'daily' ),
+	);
+};
+add_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_bad );
+np_assert( 'daily' === NanoPost_Email_Check_Settings::interval() && get_option( 'admin_email' ) === NanoPost_Email_Check_Settings::recipient(), 'stored arrays do not break the getters' );
+remove_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_bad );
+$np = NanoPost_Email_Check_Settings::sanitize(
+	array(
+		'recipient'   => array( 'a@example.com' ),
+		'webhook_url' => array( 'x' ),
+	)
+);
+np_assert( '' === $np['webhook_url'], 'array input is ignored', $np );
+delete_option( NanoPost_Email_Check_Settings::OPTION );
+update_option( NanoPost_Email_Check_Webhook::STATE_OPTION, array( 'last_status' => 'oops' ) );
+np_assert( array() === NanoPost_Email_Check_Webhook::state()['last_status'], 'bad webhook state is reset to an array' );
+delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+
 // ---------------------------------------------------------------------------------------
 np_section( 'Schedule' );
 np_reset();
@@ -174,6 +197,23 @@ update_option(
 );
 $np_event = wp_get_scheduled_event( NanoPost_Email_Check_Scheduler::HOOK );
 np_assert( $np_event && 'twicedaily' === $np_event->schedule, 'changing the interval reschedules', $np_event );
+
+$np_before = $np_event->timestamp;
+update_option(
+	NanoPost_Email_Check_Settings::OPTION,
+	array(
+		'recipient' => 'other@example.com',
+		'interval'  => 'twicedaily',
+	)
+);
+np_assert( wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ) === $np_before, 'saving other settings keeps the next run' );
+
+wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
+delete_option( NanoPost_Email_Check_Settings::OPTION );
+NanoPost_Email_Check_Scheduler::activate();
+$np_before = wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK );
+add_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'first@example.com' ) );
+np_assert( wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ) === $np_before, 'first save with the default interval keeps the next run' );
 
 NanoPost_Email_Check_Scheduler::deactivate();
 np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'deactivation removes the event' );
@@ -265,6 +305,15 @@ wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 wp_schedule_event( time() - DAY_IN_SECONDS - HOUR_IN_SECONDS, 'daily', NanoPost_Email_Check_Scheduler::HOOK );
 np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'event overdue by more than one interval is stale' );
 np_assert( 1 === count( NanoPost_Email_Check_Alerts::active() ), 'one active alert', NanoPost_Email_Check_Alerts::active() );
+set_transient( 'doing_cron', sprintf( '%.22F', microtime( true ) ) );
+np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'not stale while WP-Cron was just started' );
+delete_transient( 'doing_cron' );
+
+np_reset();
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'other_check', 'scheduled', false, 'broken' ) );
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', true ) );
+$np_failed = NanoPost_Email_Check_Alerts::failed_result();
+np_assert( null !== $np_failed && 'other_check' === $np_failed->check, 'a failure of one check is not hidden by a pass of another' );
 
 $np_editor = wp_insert_user(
 	array(
@@ -313,8 +362,33 @@ np_assert( 'pass' === $np_body['status'] && '' === $np_body['error'], 'recovery:
 $np_state = NanoPost_Email_Check_Webhook::state();
 np_assert( ! empty( $np_state['last_delivery']['ok'] ) && '204 No Content' === $np_state['last_delivery']['detail'], 'last delivery recorded', $np_state['last_delivery'] );
 
-update_option( NanoPost_Email_Check_Settings::OPTION, array( 'webhook_url' => 'https://chat.googleapis.com/v1/spaces/X/messages?key=k' ) );
+// A recovery message that does not arrive is sent again on the next pass.
 remove_filter( 'pre_wp_mail', '__return_true' );
+add_filter( 'pre_wp_mail', '__return_false' );
+NanoPost_Email_Check_Plugin::run_checks( 'manual' );
+remove_filter( 'pre_wp_mail', '__return_false' );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_n                    = count( $GLOBALS['np_requests'] );
+$GLOBALS['np_http_code'] = 500;
+NanoPost_Email_Check_Plugin::run_checks( 'scheduled' );
+$GLOBALS['np_http_code'] = 204;
+NanoPost_Email_Check_Plugin::run_checks( 'scheduled' );
+np_assert( 2 === count( $GLOBALS['np_requests'] ) - $np_n, 'failed recovery message is retried', count( $GLOBALS['np_requests'] ) - $np_n );
+np_assert( 'pass' === json_decode( end( $GLOBALS['np_requests'] )['args']['body'], true )['status'], 'retry is the recovery message' );
+
+// A failure sent to one URL gets no recovery message at a new URL.
+remove_filter( 'pre_wp_mail', '__return_true' );
+add_filter( 'pre_wp_mail', '__return_false' );
+NanoPost_Email_Check_Plugin::run_checks( 'manual' );
+remove_filter( 'pre_wp_mail', '__return_false' );
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'webhook_url' => 'https://hooks.slack.com/services/T/B/other' ) );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_n = count( $GLOBALS['np_requests'] );
+NanoPost_Email_Check_Plugin::run_checks( 'scheduled' );
+remove_filter( 'pre_wp_mail', '__return_true' );
+np_assert( count( $GLOBALS['np_requests'] ) === $np_n, 'new URL: no recovery message for an old failure' );
+
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'webhook_url' => 'https://chat.googleapis.com/v1/spaces/X/messages?key=k' ) );
 add_filter( 'pre_wp_mail', '__return_false' );
 NanoPost_Email_Check_Plugin::run_checks( 'manual' );
 remove_filter( 'pre_wp_mail', '__return_false' );
@@ -331,7 +405,7 @@ np_section( 'Uninstall' );
 update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'x@example.com' ) );
 NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'manual', true ) );
 update_option( NanoPost_Email_Check_Webhook::STATE_OPTION, array( 'last_status' => array() ) );
-update_user_meta( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
+update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	define( 'WP_UNINSTALL_PLUGIN', 'nanopost-email-check/nanopost-email-check.php' );
@@ -340,7 +414,7 @@ require NANOPOST_EMAIL_CHECK_DIR . 'uninstall.php';
 wp_cache_flush();
 $np_left = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->options WHERE option_name LIKE 'nanopost\\_email\\_check%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 np_assert( 0 === $np_left, 'no options left', $np_left );
-np_assert( '' === get_user_meta( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, true ), 'no user meta left' );
+np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'no dismissed-notice user option left' );
 np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'no scheduled event left' );
 
 // ---------------------------------------------------------------------------------------
