@@ -30,7 +30,7 @@ A pass means the mail system WordPress uses accepted the message. It does not pr
 * **Admin notice when a check fails**, for users who can manage options. It clears by itself when the next check passes, and each user can dismiss it. A new failure shows it again.
 * **Admin notice when the checks stop:** if no scheduled check has run for twice the interval, WP-Cron is probably not running, and the plugin tells you.
 * **Optional webhook:** post failures to Slack, Google Chat, Discord or any service that accepts a webhook, so the alert does not depend on the email that just broke. One more message is sent when checks pass again.
-* **Help links** for each result, to plain-language help pages on nanopo.st, including an error decoder.
+* **Help links** for failed and stopped checks, to plain-language help pages on nanopo.st, including an error decoder.
 
 The plugin screen is at **Tools > Email Check**.
 
@@ -44,7 +44,7 @@ Full documentation: [nanopo.st/email-check](https://nanopo.st/email-check/). Sou
 4. Choose how often to check, and save.
 5. Press **Send test now** and check that the email arrives.
 
-The first scheduled check runs one interval after activation.
+The first scheduled check runs one interval after activation. Changing the schedule starts the count again.
 
 == Frequently Asked Questions ==
 
@@ -68,6 +68,10 @@ The checks run on WP-Cron, which runs when people visit the site. On a site with
 
 Yes. Enter a webhook URL on the plugin screen. Slack and Google Chat incoming webhooks work directly. For Discord, add `/slack` to the end of the webhook URL. Automation services can pass the message on to SMS, Microsoft Teams or other tools.
 
+= Does it work on multisite? =
+
+Yes. Each site runs its own checks, with its own settings, log and notices. When the plugin is network-activated, each site schedules its checks the first time an administrator opens wp-admin on that site.
+
 = What happens to the data when I delete the plugin? =
 
 Deleting the plugin removes its settings, the log, the webhook state, the dismissed-notice records and the scheduled event.
@@ -78,7 +82,13 @@ The plugin makes no outside requests unless you set a webhook URL.
 
 = Webhook (optional) =
 
-When you enter a webhook URL, the plugin sends an HTTP POST to that URL when a check fails, and once when checks pass again after a failure. The JSON body holds a short text line, the site address, the status (fail or pass), the error text and the time of the check. For a Google Chat URL, only the text line is sent. The request goes only to the URL you enter, and it is governed by the terms and privacy policy of the service that URL belongs to (for example Slack, Google or Discord). Leave the field empty to send nothing.
+When you enter a webhook URL, the plugin sends an HTTP POST to that URL when a check fails, and once when checks pass again after a failure. The JSON body holds a short text line, the site address, the status (fail or pass), the error text and the time of the check. For a Google Chat URL, only the text line is sent. The request goes only to the URL you enter, and it is governed by the terms and privacy policy of the service that URL belongs to. Leave the field empty to send nothing.
+
+The setup help names these services. The plugin sends to them only when you enter one of their webhook URLs:
+
+* Slack incoming webhooks: [terms](https://slack.com/terms-of-service), [privacy policy](https://slack.com/trust/privacy/privacy-policy)
+* Google Chat webhooks: [terms](https://policies.google.com/terms), [privacy policy](https://policies.google.com/privacy)
+* Discord webhooks: [terms](https://discord.com/terms), [privacy policy](https://discord.com/privacy)
 
 = Help pages on nanopo.st =
 
