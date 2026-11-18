@@ -30,6 +30,7 @@ require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-sch
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-plugin.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-help.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-alerts.php';
+require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-webhook.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-admin.php';
 
 register_activation_hook( __FILE__, array( 'NanoPost_Email_Check_Scheduler', 'activate' ) );

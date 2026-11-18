@@ -35,8 +35,9 @@ class NanoPost_Email_Check_Settings {
 	 */
 	public static function defaults() {
 		return array(
-			'recipient' => '',
-			'interval'  => 'daily',
+			'recipient'   => '',
+			'interval'    => 'daily',
+			'webhook_url' => '',
 		);
 	}
 
@@ -67,6 +68,16 @@ class NanoPost_Email_Check_Settings {
 	public static function interval() {
 		$settings = self::get();
 		return array_key_exists( $settings['interval'], self::intervals() ) ? $settings['interval'] : 'daily';
+	}
+
+	/**
+	 * The webhook URL, or an empty string when none is set.
+	 *
+	 * @return string
+	 */
+	public static function webhook_url() {
+		$settings = self::get();
+		return (string) $settings['webhook_url'];
 	}
 
 	/**
@@ -116,6 +127,23 @@ class NanoPost_Email_Check_Settings {
 		if ( array_key_exists( 'interval', $input ) ) {
 			$interval           = sanitize_key( wp_unslash( $input['interval'] ) );
 			$output['interval'] = array_key_exists( $interval, self::intervals() ) ? $interval : 'daily';
+		}
+
+		if ( array_key_exists( 'webhook_url', $input ) ) {
+			$raw = trim( (string) wp_unslash( $input['webhook_url'] ) );
+			$url = esc_url_raw( $raw, array( 'https', 'http' ) );
+
+			if ( '' === $raw ) {
+				$output['webhook_url'] = '';
+			} elseif ( '' !== $url && wp_http_validate_url( $url ) ) {
+				$output['webhook_url'] = $url;
+			} else {
+				add_settings_error(
+					self::OPTION,
+					'invalid_webhook_url',
+					__( 'The webhook URL is not valid. It must be a public http or https address. The previous URL was kept.', 'nanopost-email-check' )
+				);
+			}
 		}
 
 		return $output;

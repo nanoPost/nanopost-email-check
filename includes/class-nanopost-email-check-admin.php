@@ -87,6 +87,46 @@ class NanoPost_Email_Check_Admin {
 			'nanopost_email_check_main',
 			array( 'label_for' => 'nanopost_email_check_interval' )
 		);
+
+		add_settings_field(
+			'nanopost_email_check_webhook_url',
+			__( 'Webhook URL', 'nanopost-email-check' ),
+			array( __CLASS__, 'field_webhook_url' ),
+			self::PAGE,
+			'nanopost_email_check_main',
+			array( 'label_for' => 'nanopost_email_check_webhook_url' )
+		);
+	}
+
+	/**
+	 * Webhook URL field, with the result of the last delivery.
+	 */
+	public static function field_webhook_url() {
+		$settings = NanoPost_Email_Check_Settings::get();
+		printf(
+			'<input type="url" class="large-text code" id="nanopost_email_check_webhook_url" name="%1$s[webhook_url]" value="%2$s" placeholder="https://hooks.slack.com/services/..." autocomplete="off" />',
+			esc_attr( NanoPost_Email_Check_Settings::OPTION ),
+			esc_attr( $settings['webhook_url'] )
+		);
+		echo '<p class="description">';
+		esc_html_e( 'Optional. When a check fails, the plugin posts a short JSON message to this URL, and once more when checks pass again. Works with Slack, Google Chat, Discord (Slack-compatible URL) and automation services. Leave empty for no outside requests.', 'nanopost-email-check' );
+		echo ' ' . self::help_link( NanoPost_Email_Check_Help::webhook(), __( 'How to set up a webhook', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+		echo '</p>';
+
+		$delivery = NanoPost_Email_Check_Webhook::state()['last_delivery'];
+		if ( '' !== $settings['webhook_url'] && ! empty( $delivery['time'] ) ) {
+			echo '<p class="description">';
+			echo esc_html(
+				sprintf(
+					/* translators: 1: date and time, 2: "delivered" or "failed", 3: HTTP status or error text. */
+					__( 'Last webhook message: %1$s, %2$s (%3$s).', 'nanopost-email-check' ),
+					self::format_time( (int) $delivery['time'] ),
+					! empty( $delivery['ok'] ) ? __( 'delivered', 'nanopost-email-check' ) : __( 'failed', 'nanopost-email-check' ),
+					isset( $delivery['detail'] ) ? (string) $delivery['detail'] : ''
+				)
+			);
+			echo '</p>';
+		}
 	}
 
 	/**
