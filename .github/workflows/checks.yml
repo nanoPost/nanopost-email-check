@@ -12,7 +12,7 @@ jobs:
     name: Coding standards
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -28,7 +28,7 @@ jobs:
     name: Plugin Check (release files)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Check exactly what ships: the tracked files that git archive puts in the zip.
       - name: Build release folder
