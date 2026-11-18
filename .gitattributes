@@ -11,3 +11,4 @@
 /phpunit.xml.dist   export-ignore
 /tests              export-ignore
 /README.md          export-ignore
+/.wordpress-org     export-ignore

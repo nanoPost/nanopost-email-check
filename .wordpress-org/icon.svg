@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" fill="#fd821a"/>
+  <!-- Envelope, drawn in the thick-line style of the nanoPost bee. -->
+  <g fill="none" stroke="#231f20" stroke-width="16" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="34" y="62" width="172" height="124" rx="18"/>
+    <path d="M48 78 L112 128 Q120 134 128 128 L192 78"/>
+  </g>
+  <!-- Check badge. -->
+  <circle cx="190" cy="178" r="50" fill="#231f20" stroke="#fd821a" stroke-width="12"/>
+  <path d="M167 179 L184 196 L214 162" fill="none" stroke="#fd821a" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
