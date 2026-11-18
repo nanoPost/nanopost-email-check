@@ -1,0 +1,42 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  phpcs:
+    name: Coding standards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+
+      - run: composer install --no-interaction --no-progress
+
+      - run: vendor/bin/phpcs
+
+  plugin-check:
+    name: Plugin Check (release files)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Check exactly what ships: the tracked files that git archive puts in the zip.
+      - name: Build release folder
+        run: |
+          mkdir -p build/nanopost-email-check
+          git archive HEAD | tar -x -C build/nanopost-email-check
+
+      - uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: build/nanopost-email-check
+          slug: nanopost-email-check

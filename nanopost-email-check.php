@@ -1,15 +1,18 @@
 <?php
-/*
-Plugin Name: Daily Email Tester
-Plugin URI: https://github.com/nanopost/daily-email-tester.php
-Description: Sends a daily test email to a specified address.
-Version: 0.0.1
-Author: nanoPost
-Text Domain: daily-email-tester
-Author URI: https://nanopo.st/
-License: GPLv2 or later
-License URI: http://www.gnu.org/licenses/gpl-2.0.html
-*/
+/**
+ * Plugin Name:       nanoPost Email Check
+ * Description:       Check that your site can still send email. Sends a scheduled test email, logs each result and warns you when a check fails.
+ * Version:           1.0.0
+ * Requires at least: 6.4
+ * Requires PHP:      7.4
+ * Author:            nanoPost
+ * Author URI:        https://nanopo.st/
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       nanopost-email-check
+ *
+ * @package NanoPost_Email_Check
+ */
 
 // Schedule daily email on plugin activation
 register_activation_hook( __FILE__, 'dailytester_activate' );
