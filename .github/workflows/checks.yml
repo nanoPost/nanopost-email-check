@@ -41,6 +41,16 @@ jobs:
           build-dir: build/nanopost-email-check
           slug: nanopost-email-check
 
+      # The zip to upload to WordPress.org: the same files, as git archive builds them.
+      - name: Build release zip
+        run: git archive --format=zip --prefix=nanopost-email-check/ -o nanopost-email-check.zip HEAD
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: nanopost-email-check-zip
+          path: nanopost-email-check.zip
+          retention-days: 30
+
   integration:
     name: Integration tests (wp-env, PHP 7.4)
     runs-on: ubuntu-latest
