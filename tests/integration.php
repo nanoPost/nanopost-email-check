@@ -186,6 +186,14 @@ np_section( 'Real send through Mailpit' );
 np_reset();
 update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'check@example.com' ) );
 
+// On a site at localhost, WordPress uses wordpress@localhost as From, and PHPMailer refuses it.
+add_filter(
+	'wp_mail_from',
+	static function () {
+		return 'wordpress@example.com';
+	}
+);
+
 $np_mailpit_up = null !== np_mailpit( 'GET', 'info' );
 np_assert( $np_mailpit_up, 'Mailpit is reachable' );
 
