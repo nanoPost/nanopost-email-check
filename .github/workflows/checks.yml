@@ -40,3 +40,20 @@ jobs:
         with:
           build-dir: build/nanopost-email-check
           slug: nanopost-email-check
+
+  integration:
+    name: Integration tests (wp-env, PHP 7.4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx wp-env start
+
+      - run: npm test
