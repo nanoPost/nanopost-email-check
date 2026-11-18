@@ -296,6 +296,7 @@ np_assert( null !== NanoPost_Email_Check_Alerts::failed_result(), 'failed latest
 NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', true ) );
 np_assert( null === NanoPost_Email_Check_Alerts::failed_result(), 'a pass clears it' );
 
+NanoPost_Email_Check_Alerts::remember_cron_lock();
 wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', NanoPost_Email_Check_Scheduler::HOOK );
 np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'event in the future is not stale' );
 wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
@@ -305,8 +306,12 @@ wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 wp_schedule_event( time() - DAY_IN_SECONDS - HOUR_IN_SECONDS, 'daily', NanoPost_Email_Check_Scheduler::HOOK );
 np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'event overdue by more than one interval is stale' );
 np_assert( 1 === count( NanoPost_Email_Check_Alerts::active() ), 'one active alert', NanoPost_Email_Check_Alerts::active() );
+NanoPost_Email_Check_Alerts::remember_cron_lock();
+np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'an old WP-Cron lock does not hide it' );
 set_transient( 'doing_cron', sprintf( '%.22F', microtime( true ) ) );
-np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'not stale while WP-Cron was just started' );
+np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'not stale on the page load that started WP-Cron' );
+NanoPost_Email_Check_Alerts::remember_cron_lock();
+np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'stale again on the next page load if WP-Cron did not run' );
 delete_transient( 'doing_cron' );
 
 np_reset();

@@ -18,11 +18,42 @@ class NanoPost_Email_Check_Alerts {
 	const DISMISSED_META = 'nanopost_email_check_dismissed';
 
 	/**
+	 * The WP-Cron lock ("doing_cron" transient) before WordPress may start WP-Cron for this
+	 * request. Null when not recorded.
+	 *
+	 * @var string|null
+	 */
+	private static $cron_lock_before = null;
+
+	/**
 	 * Register hooks.
 	 */
 	public static function init() {
 		add_action( 'admin_notices', array( __CLASS__, 'render' ) );
 		add_action( 'admin_post_' . self::DISMISS_ACTION, array( __CLASS__, 'handle_dismiss' ) );
+		// WordPress starts WP-Cron on wp_loaded (priority 10). Record the lock before that.
+		add_action( 'wp_loaded', array( __CLASS__, 'remember_cron_lock' ), 0 );
+	}
+
+	/**
+	 * Record the WP-Cron lock before WordPress may start WP-Cron for this request.
+	 */
+	public static function remember_cron_lock() {
+		self::$cron_lock_before = (string) get_transient( 'doing_cron' );
+	}
+
+	/**
+	 * True when this request has just started WP-Cron: the lock is set and changed since the
+	 * start of the request. WP-Cron then runs in a separate request that may not have finished.
+	 *
+	 * @return bool
+	 */
+	private static function cron_started_now() {
+		if ( null === self::$cron_lock_before ) {
+			return false;
+		}
+		$lock = (string) get_transient( 'doing_cron' );
+		return '' !== $lock && $lock !== self::$cron_lock_before;
 	}
 
 	/**
@@ -55,9 +86,9 @@ class NanoPost_Email_Check_Alerts {
 			return null;
 		}
 
-		// WP-Cron may have just been started for this page load and not yet run the event.
-		$doing_cron = (float) get_transient( 'doing_cron' );
-		if ( $doing_cron > 0 && time() - $doing_cron < MINUTE_IN_SECONDS ) {
+		// This page load has just started WP-Cron, which may be running the event right now.
+		// If it does not, the next page load shows the notice.
+		if ( self::cron_started_now() ) {
 			return null;
 		}
 
