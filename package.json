@@ -12,8 +12,8 @@
 		"screenshots": "node screenshots/shoot.cjs"
 	},
 	"devDependencies": {
-		"@wordpress/env": "12.0.0",
-		"playwright-core": "1.63.0"
+		"@wordpress/env": "12.1.0",
+		"playwright-core": "1.65.1"
 	},
 	"overrides": {
 		"isomorphic-git": "1.39.0",
