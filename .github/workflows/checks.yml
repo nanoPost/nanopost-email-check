@@ -86,7 +86,8 @@ jobs:
 
       - name: Multisite config
         if: ${{ matrix.multisite }}
-        run: echo '{ "multisite": true }' > .wp-env.override.json
+        run: |
+          echo '{ "multisite": true }' > .wp-env.override.json
 
       - run: npx wp-env start
         env:
