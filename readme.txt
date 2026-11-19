@@ -28,7 +28,7 @@ A pass means the mail system WordPress uses accepted the message. It does not pr
 * **Send test now:** run a check at once from the plugin screen.
 * **Result log:** the last 30 results, with the time, what started the check, pass or fail, the recipient and the error text.
 * **Admin notice when a check fails**, for users who can manage options. It clears by itself when the next check passes, and each user can dismiss it. A new failure shows it again.
-* **Admin notice when the checks stop:** if no scheduled check has run for twice the interval, WP-Cron is probably not running, and the plugin tells you.
+* **Admin notice when the checks stop:** if no scheduled check has finished for twice the interval, the plugin tells you. The usual causes are WP-Cron not running, or a check that crashes with a PHP error.
 * **Optional webhook:** post failures to Slack, Google Chat, Discord or any service that accepts a webhook, so the alert does not depend on the email that just broke. One more message is sent when checks pass again.
 * **Help links** for failed and stopped checks, to plain-language help pages on nanopo.st, including an error decoder.
 
@@ -62,7 +62,7 @@ No. See "External services" below.
 
 = The notice says the checks have stopped. What does that mean? =
 
-The checks run on WP-Cron, which runs when people visit the site. On a site with few visitors, or when `DISABLE_WP_CRON` is set without a server cron job, scheduled events stop. The checks are not failing, they are not running. The help link in the notice explains how to fix it.
+No scheduled check has finished for twice the interval. Usually WP-Cron is not running them: it runs when people visit the site, so on a site with few visitors, or when `DISABLE_WP_CRON` is set without a server cron job, scheduled events stop. Less often the check starts but crashes, for example with a PHP error in a mail plugin; the PHP error log then shows the cause. The help link in the notice explains how to fix it.
 
 = Can I get alerts somewhere other than email? =
 
