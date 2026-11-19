@@ -5,8 +5,11 @@ name: Release
 #
 # - The full checks (coding standards, Plugin Check, integration tests) run on the tagged
 #   commit first. Nothing is published unless they pass.
-# - Every version tag gets a GitHub Release with the plugin zip.
-# - 0.x versions are review candidates before the first listing: GitHub pre-release only.
+# - Every version tag gets a GitHub Release with the plugin zip. It becomes GitHub's
+#   "latest" release, so /releases/latest/download/nanopost-email-check.zip always serves
+#   the newest zip (GitHub's "latest" skips pre-releases, so none are marked as such).
+# - 0.x versions are review candidates before the first listing: GitHub only, never
+#   deployed.
 # - 1.0.0 and later are also deployed to WordPress.org. That needs the repository secrets
 #   SVN_USERNAME and SVN_PASSWORD (the WordPress.org account).
 #
@@ -74,10 +77,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          prerelease=""
-          case "$GITHUB_REF_NAME" in 0.*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" nanopost-email-check.zip \
-            --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag $prerelease
+            --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag --latest
 
   deploy:
     name: Deploy to WordPress.org
