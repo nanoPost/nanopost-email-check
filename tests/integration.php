@@ -14,6 +14,18 @@ if ( ! defined( 'WP_CLI' ) ) {
 	exit;
 }
 
+// Record PHP notices, warnings and deprecations raised in the plugin's own files, on
+// every PHP version in the CI matrix. Normal error handling continues (return false).
+$GLOBALS['np_php_notices'] = array();
+set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- Test only.
+	static function ( $errno, $errstr, $errfile, $errline ) {
+		if ( 0 === strpos( (string) $errfile, NANOPOST_EMAIL_CHECK_DIR ) ) {
+			$GLOBALS['np_php_notices'][] = basename( $errfile ) . ':' . $errline . ' ' . $errstr;
+		}
+		return false;
+	}
+);
+
 $GLOBALS['np_failures'] = 0;
 $GLOBALS['np_count']    = 0;
 
@@ -875,6 +887,10 @@ if ( $np_second ) {
 }
 
 // ---------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------
+np_section( 'PHP notices' );
+np_assert( array() === $GLOBALS['np_php_notices'], 'no PHP notice, warning or deprecation from plugin code (PHP ' . PHP_VERSION . ')', $GLOBALS['np_php_notices'] );
+
 // ---------------------------------------------------------------------------------------
 np_section( 'Isolation' );
 $wpdb->query( 'ROLLBACK' );
