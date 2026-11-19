@@ -25,4 +25,12 @@ elif ! docker inspect -f '{{json .NetworkSettings.Networks}}' "$MAILPIT_NAME" | 
   docker network connect --alias mailpit "$network" "$MAILPIT_NAME"
 fi
 
+# On multisite, the tests need a second site. Creating one adds tables (DDL), which would
+# end the tests' database transaction, so it is created here, before the run.
+if npx wp-env run cli wp eval 'echo is_multisite() ? "yes" : "no";' 2>/dev/null | grep -qx yes; then
+  if [ "$(npx wp-env run cli wp site list --field=blog_id 2>/dev/null | grep -c '^[0-9]')" -lt 2 ]; then
+    npx wp-env run cli wp site create --slug=second --title=Second --quiet
+  fi
+fi
+
 npx wp-env run cli wp eval-file wp-content/plugins/nanopost-email-check/tests/integration.php

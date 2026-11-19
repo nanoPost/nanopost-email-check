@@ -683,6 +683,51 @@ remove_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_fake_u
 wp_set_current_user( 0 );
 
 // ---------------------------------------------------------------------------------------
+if ( is_multisite() ) {
+	np_section( 'Multisite' );
+	np_reset();
+	$np_site2 = (int) get_sites(
+		array(
+			'fields'       => 'ids',
+			'site__not_in' => array( get_current_blog_id() ),
+			'number'       => 1,
+		)
+	)[0];
+	np_assert( $np_site2 > 0, 'a second site exists (made by tests/run.sh)' );
+
+	// Settings and log are per site.
+	update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'main@example.com' ) );
+	switch_to_blog( $np_site2 );
+	np_reset();
+	np_assert( get_option( 'admin_email' ) === NanoPost_Email_Check_Settings::recipient(), 'settings are per site' );
+	NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, 'site two' ) );
+	restore_current_blog();
+	np_assert( array() === NanoPost_Email_Check_Log::all(), 'the log is per site' );
+
+	// Dismissed notices are per site.
+	update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
+	switch_to_blog( $np_site2 );
+	np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'a dismissal on one site does not reach another' );
+	restore_current_blog();
+
+	// Network activation: each site schedules on its first admin page load.
+	switch_to_blog( $np_site2 );
+	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
+	np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'second site starts without an event' );
+	do_action( 'admin_init' );
+	np_assert( false !== wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'admin_init schedules it on that site' );
+	restore_current_blog();
+
+	// Network deactivation clears every site.
+	NanoPost_Email_Check_Scheduler::ensure_scheduled();
+	NanoPost_Email_Check_Scheduler::deactivate( true );
+	np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'network deactivation clears the main site' );
+	switch_to_blog( $np_site2 );
+	np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'network deactivation clears the second site' );
+	restore_current_blog();
+}
+
+// ---------------------------------------------------------------------------------------
 np_section( 'Help links' );
 np_assert( 'https://nanopo.st/email-check-plugin/error/#error=SMTP%20Error%3A%20x%26y' === NanoPost_Email_Check_Help::error( 'SMTP Error: x&y' ), 'error text is rawurlencoded after #' );
 np_assert( strlen( rawurldecode( substr( NanoPost_Email_Check_Help::error( str_repeat( 'a', 5000 ) ), strlen( 'https://nanopo.st/email-check-plugin/error/#error=' ) ) ) ) === 4000, 'error text is cut at 4,000 characters' );
@@ -695,6 +740,22 @@ update_option( NanoPost_Email_Check_Webhook::STATE_OPTION, array( 'last_status' 
 np_schedule_state( time(), time() );
 update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
+$np_second = 0;
+if ( is_multisite() ) {
+	$np_second = (int) get_sites(
+		array(
+			'fields'       => 'ids',
+			'site__not_in' => array( get_current_blog_id() ),
+			'number'       => 1,
+		)
+	)[0];
+	switch_to_blog( $np_second );
+	update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'second@example.com' ) );
+	NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'manual', true ) );
+	update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:2' ) );
+	NanoPost_Email_Check_Scheduler::ensure_scheduled();
+	restore_current_blog();
+}
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	define( 'WP_UNINSTALL_PLUGIN', 'nanopost-email-check/nanopost-email-check.php' );
 }
@@ -704,6 +765,14 @@ $np_left = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->options WHERE opti
 np_assert( 0 === $np_left, 'no options left', $np_left );
 np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'no dismissed-notice user option left' );
 np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'no scheduled event left' );
+if ( $np_second ) {
+	switch_to_blog( $np_second );
+	wp_cache_flush();
+	np_assert( false === get_option( NanoPost_Email_Check_Settings::OPTION ) && false === get_option( NanoPost_Email_Check_Log::OPTION ), 'multisite: second site options removed' );
+	np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'multisite: second site event removed' );
+	np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'multisite: second site dismissed notices removed' );
+	restore_current_blog();
+}
 
 // ---------------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------------
