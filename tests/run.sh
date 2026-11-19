@@ -25,6 +25,19 @@ elif ! docker inspect -f '{{json .NetworkSettings.Networks}}' "$MAILPIT_NAME" | 
   docker network connect --alias mailpit "$network" "$MAILPIT_NAME"
 fi
 
+# Webhook receiver: a small HTTP server that records requests (tests/webhook-receiver.py).
+# Recreated on every run, so it always serves the current script.
+RECEIVER_IMAGE="python:3.13.17-alpine"
+RECEIVER_NAME="nanopost-email-check-webhook"
+docker rm -f "$RECEIVER_NAME" >/dev/null 2>&1 || true
+docker run -d --name "$RECEIVER_NAME" --network "$network" --network-alias webhook \
+  -v "$PWD/tests/webhook-receiver.py:/srv/receiver.py:ro" \
+  "$RECEIVER_IMAGE" python -I /srv/receiver.py >/dev/null
+for _ in $(seq 1 20); do
+  docker exec "$RECEIVER_NAME" python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/_requests')" >/dev/null 2>&1 && break
+  sleep 0.5
+done
+
 # On multisite, the tests need a second site. Creating one adds tables (DDL), which would
 # end the tests' database transaction, so it is created here, before the run.
 if npx wp-env run cli wp eval 'echo is_multisite() ? "yes" : "no";' 2>/dev/null | grep -qx yes; then

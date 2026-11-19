@@ -124,8 +124,8 @@ $GLOBALS['np_requests'] = array();
 add_filter(
 	'pre_http_request',
 	static function ( $pre, $args, $url ) {
-		// Mailpit API calls, and tests of the real request, pass through.
-		if ( 0 === strpos( $url, 'http://mailpit:' ) || ! empty( $GLOBALS['np_http_passthrough'] ) ) {
+		// Mailpit and webhook-receiver calls, and tests of the real request, pass through.
+		if ( 0 === strpos( $url, 'http://mailpit:' ) || 0 === strpos( $url, 'http://webhook:' ) || ! empty( $GLOBALS['np_http_passthrough'] ) ) {
 			return $pre;
 		}
 		$GLOBALS['np_requests'][] = array(
@@ -726,6 +726,103 @@ if ( is_multisite() ) {
 	switch_to_blog( $np_site2 );
 	np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'network deactivation clears the second site' );
 	restore_current_blog();
+}
+
+// ---------------------------------------------------------------------------------------
+np_section( 'Webhook: real HTTP delivery to a local receiver' );
+np_reset();
+
+/**
+ * Call the receiver's API directly (not through the plugin).
+ *
+ * @param string $method HTTP method.
+ * @return array|null Recorded requests.
+ */
+function np_receiver( $method ) {
+	$response = wp_remote_request(
+		'http://webhook:8080/_requests',
+		array(
+			'method'  => $method,
+			'timeout' => 5,
+		)
+	);
+	return is_wp_error( $response ) ? null : json_decode( wp_remote_retrieve_body( $response ), true );
+}
+
+$np_receiver_up = null !== np_receiver( 'GET' );
+np_assert( $np_receiver_up, 'webhook receiver is reachable' );
+
+if ( $np_receiver_up ) {
+	// The receiver is on a private Docker address. Let only that host through the plugin's
+	// safety check; everything else stays refused.
+	$np_allow_receiver = static function ( $external, $host ) {
+		return 'webhook' === $host ? true : $external;
+	};
+	add_filter( 'http_request_host_is_external', $np_allow_receiver, 10, 2 );
+	$np_hook_url = '';
+	$np_url_opt  = static function () use ( &$np_hook_url ) {
+		return array( 'webhook_url' => $np_hook_url );
+	};
+	add_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_url_opt );
+	$GLOBALS['np_http_passthrough'] = true;
+	$np_fail                        = new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, 'SMTP Error: Could not authenticate.' );
+	$np_pass                        = new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', true );
+
+	// A failure, then the recovery, really sent.
+	np_receiver( 'DELETE' );
+	$np_hook_url = 'http://webhook:8080/hook';
+	NanoPost_Email_Check_Webhook::on_result( $np_fail );
+	NanoPost_Email_Check_Webhook::on_result( $np_pass );
+	NanoPost_Email_Check_Webhook::on_result( $np_pass );
+	$np_got = np_receiver( 'GET' );
+	np_assert( 2 === count( $np_got ), 'receiver got the failure and one recovery message', count( $np_got ) );
+	$np_first = $np_got[0];
+	$np_body  = json_decode( $np_first['body'], true );
+	np_assert( 'POST' === $np_first['method'] && '/hook' === $np_first['path'], 'sent as POST to the path in the URL' );
+	np_assert( 'application/json; charset=utf-8' === $np_first['headers']['content-type'], 'Content-Type arrives as sent', $np_first['headers']['content-type'] );
+	np_assert( is_array( $np_body ) && array( 'text', 'site', 'status', 'error', 'time' ) === array_keys( $np_body ), 'body arrives as JSON with all fields', $np_first['body'] );
+	np_assert( 'fail' === $np_body['status'] && 'SMTP Error: Could not authenticate.' === $np_body['error'], 'failure body intact' );
+	np_assert( 'pass' === json_decode( $np_got[1]['body'], true )['status'], 'recovery body intact' );
+	$np_d = NanoPost_Email_Check_Webhook::state()['last_delivery'];
+	np_assert( ! empty( $np_d['ok'] ) && 0 === strpos( $np_d['detail'], '200' ), 'delivery recorded as 200', $np_d );
+
+	// Receiver errors.
+	np_receiver( 'DELETE' );
+	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+	$np_hook_url = 'http://webhook:8080/status/500';
+	NanoPost_Email_Check_Webhook::on_result( $np_fail );
+	$np_d = NanoPost_Email_Check_Webhook::state()['last_delivery'];
+	np_assert( empty( $np_d['ok'] ) && 0 === strpos( $np_d['detail'], '500' ), 'HTTP 500 is a failed delivery', $np_d );
+
+	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+	$np_hook_url = 'http://webhook:8080/slow';
+	$np_t        = microtime( true );
+	NanoPost_Email_Check_Webhook::on_result( $np_fail );
+	$np_took = microtime( true ) - $np_t;
+	$np_d    = NanoPost_Email_Check_Webhook::state()['last_delivery'];
+	np_assert( empty( $np_d['ok'] ) && $np_took < 8, 'a slow receiver times out after about 5 s', array( $np_d, round( $np_took, 1 ) ) );
+
+	// A redirect to a private address is not followed.
+	np_receiver( 'DELETE' );
+	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+	$np_hook_url = 'http://webhook:8080/redirect-private';
+	NanoPost_Email_Check_Webhook::on_result( $np_fail );
+	$np_d   = NanoPost_Email_Check_Webhook::state()['last_delivery'];
+	$np_got = np_receiver( 'GET' );
+	np_assert( empty( $np_d['ok'] ), 'redirect to 127.0.0.1 is not followed', $np_d );
+	np_assert( 1 === count( $np_got ) && '/redirect-private' === $np_got[0]['path'], 'only the first request was made', $np_got );
+
+	// Control: a redirect to an allowed host is followed, so the refusal above is the safety check.
+	np_receiver( 'DELETE' );
+	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+	$np_hook_url = 'http://webhook:8080/redirect-allowed';
+	NanoPost_Email_Check_Webhook::on_result( $np_fail );
+	$np_paths = wp_list_pluck( (array) np_receiver( 'GET' ), 'path' );
+	np_assert( array( '/redirect-allowed', '/hook' ) === $np_paths, 'control: a redirect to an allowed host is followed', $np_paths );
+
+	$GLOBALS['np_http_passthrough'] = false;
+	remove_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_url_opt );
+	remove_filter( 'http_request_host_is_external', $np_allow_receiver, 10 );
 }
 
 // ---------------------------------------------------------------------------------------
