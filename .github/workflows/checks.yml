@@ -7,6 +7,12 @@ on:
   pull_request:
   # Called by the Release workflow, so a release needs passing checks on the tagged commit.
   workflow_call:
+  # Weekly, so a new WordPress or PHP release is tested even when nobody pushes.
+  # GitHub mails the result of a failed scheduled run to the last person to edit this line.
+  schedule:
+    - cron: '17 6 * * 1'
+  # By hand: Actions > Checks > Run workflow.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -73,6 +79,10 @@ jobs:
           - name: WP latest, PHP 8.3
             core: ''
             php: '8.3'
+            multisite: false
+          - name: WP latest, PHP 8.5
+            core: ''
+            php: '8.5'
             multisite: false
           - name: WP latest, PHP 8.3, multisite
             core: ''
