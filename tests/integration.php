@@ -484,6 +484,7 @@ add_filter(
 	},
 	999
 );
+remove_all_filters( 'wp_redirect' ); // WP-CLI's own handler only prints a warning.
 add_filter(
 	'wp_redirect',
 	static function ( $location ) {
@@ -768,7 +769,9 @@ np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 
 if ( $np_second ) {
 	switch_to_blog( $np_second );
 	wp_cache_flush();
-	np_assert( false === get_option( NanoPost_Email_Check_Settings::OPTION ) && false === get_option( NanoPost_Email_Check_Log::OPTION ), 'multisite: second site options removed' );
+	// Count rows: get_option() returns the registered default for a missing settings option.
+	$np_left2 = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->options WHERE option_name LIKE 'nanopost\\_email\\_check%'" );
+	np_assert( 0 === $np_left2, 'multisite: second site options removed', $np_left2 );
 	np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'multisite: second site event removed' );
 	np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'multisite: second site dismissed notices removed' );
 	restore_current_blog();
