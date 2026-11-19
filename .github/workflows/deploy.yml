@@ -1,31 +1,72 @@
-name: Deploy to WordPress.org
+name: Release
 
-# Runs when a version tag (for example 1.0.0) is pushed. Needs the repository secrets
-# SVN_USERNAME and SVN_PASSWORD (the WordPress.org account). The plugin files come from
-# git archive, so .gitattributes export-ignore decides what ships. Listing images come from
-# .wordpress-org/.
+# Runs when a version tag is pushed.
+#
+# - Every version tag (1.0.0, or a pre-release such as 1.0.0-rc.1) gets a GitHub Release
+#   with the plugin zip attached.
+# - A final version tag (1.0.0, no suffix) is also deployed to WordPress.org. That needs
+#   the repository secrets SVN_USERNAME and SVN_PASSWORD (the WordPress.org account).
+#
+# The zip is built with git archive, so .gitattributes export-ignore decides what ships.
+# WordPress.org listing images come from .wordpress-org/.
 
 on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
-
-permissions:
-  contents: read
+      - '[0-9]+.[0-9]+.[0-9]+-*'
 
 jobs:
-  deploy:
+  release:
+    name: GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
 
       - name: Tag must match the plugin version and the stable tag
         run: |
           tag="${GITHUB_REF_NAME}"
+          version="${tag%%-*}"
           header="$(grep -m1 -E '^ \* Version:' nanopost-email-check.php | awk '{print $NF}')"
           stable="$(grep -m1 -E '^Stable tag:' readme.txt | awk '{print $NF}')"
-          echo "tag=$tag header=$header stable=$stable"
-          test "$tag" = "$header" && test "$tag" = "$stable"
+          echo "tag=$tag version=$version header=$header stable=$stable"
+          test "$version" = "$header" && test "$version" = "$stable"
+
+      - name: Build the zip
+        run: git archive --format=zip --prefix=nanopost-email-check/ -o nanopost-email-check.zip HEAD
+
+      - name: Release notes from the readme changelog
+        run: |
+          version="${GITHUB_REF_NAME%%-*}"
+          awk -v v="= $version =" '
+            $0 == v { on = 1; next }
+            on && /^= / { exit }
+            on && /^== / { exit }
+            on { print }
+          ' readme.txt > notes.md
+          test -s notes.md || echo "Version $version." > notes.md
+          cat notes.md
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" nanopost-email-check.zip \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag $prerelease
+
+  deploy:
+    name: Deploy to WordPress.org
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
 
       - uses: 10up/action-wordpress-plugin-deploy@2.3.0
         env:
