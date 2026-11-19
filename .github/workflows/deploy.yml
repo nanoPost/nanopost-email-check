@@ -1,13 +1,14 @@
 name: Release
 
 # Runs when a version tag is pushed. Set the version first: npm run set-version -- <version>
+# Versions are digits and dots only (WordPress.org refuses anything else).
 #
 # - The full checks (coding standards, Plugin Check, integration tests) run on the tagged
 #   commit first. Nothing is published unless they pass.
-# - Every version tag (1.0.0, or a release candidate such as 1.0.0-rc.2) gets a GitHub
-#   Release with the plugin zip. Release candidates are marked as pre-releases.
-# - A final version tag (no suffix) is also deployed to WordPress.org. That needs the
-#   repository secrets SVN_USERNAME and SVN_PASSWORD (the WordPress.org account).
+# - Every version tag gets a GitHub Release with the plugin zip.
+# - 0.x versions are review candidates before the first listing: GitHub pre-release only.
+# - 1.0.0 and later are also deployed to WordPress.org. That needs the repository secrets
+#   SVN_USERNAME and SVN_PASSWORD (the WordPress.org account).
 #
 # The zip is built with git archive, so .gitattributes export-ignore decides what ships.
 # WordPress.org listing images come from .wordpress-org/.
@@ -16,7 +17,6 @@ on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-*'
 
 permissions:
   contents: read
@@ -52,14 +52,21 @@ jobs:
 
       - name: Release notes from the readme changelog
         run: |
-          # Release candidates use the changelog section of their final version.
-          version="${GITHUB_REF_NAME%%-*}"
-          awk -v v="= $version =" '
+          # A release uses its own changelog section. A 0.x candidate uses the newest
+          # section, which describes the release it is a candidate for.
+          version="${GITHUB_REF_NAME}"
+          case "$version" in
+            0.*) heading="$(sed -n '/^== Changelog ==/,$p' readme.txt | grep -m1 -E '^= .+ =$')" ;;
+            *)   heading="= $version =" ;;
+          esac
+          awk -v v="$heading" '
             $0 == v { on = 1; next }
             on && /^= / { exit }
             on && /^== / { exit }
             on { print }
           ' readme.txt > notes.md
+          target="$(echo "$heading" | sed 's/^= //; s/ =$//')"
+          case "$version" in 0.*) sed -i "1i Review candidate for $target." notes.md ;; esac
           test -s notes.md || echo "Version $version." > notes.md
           cat notes.md
 
@@ -68,14 +75,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           prerelease=""
-          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+          case "$GITHUB_REF_NAME" in 0.*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" nanopost-email-check.zip \
             --title "$GITHUB_REF_NAME" --notes-file notes.md --verify-tag $prerelease
 
   deploy:
     name: Deploy to WordPress.org
     needs: release
-    if: ${{ !contains(github.ref_name, '-') }}
+    if: ${{ !startsWith(github.ref_name, '0.') }}
     runs-on: ubuntu-latest
     steps:
       - name: SVN credentials must be set

@@ -5,8 +5,8 @@ name: Update WordPress.org listing
 # version: for "Tested up to", screenshots, the description or the FAQ.
 #
 # Refuses to run when:
-# - the readme "Stable tag" is not a final version that has a git tag (on main it can be
-#   a release candidate, which does not exist on WordPress.org), or
+# - the readme "Stable tag" is not a released version of 1.0.0 or later with a git tag
+#   (before the first listing, main carries a 0.x review candidate), or
 # - plugin code differs from what WordPress.org has (the 10up action checks this).
 #
 # Needs the repository secrets SVN_USERNAME and SVN_PASSWORD.
@@ -39,8 +39,8 @@ jobs:
         run: |
           stable="$(grep -m1 -E '^Stable tag:' readme.txt | awk '{print $NF}')"
           echo "stable=$stable"
-          echo "$stable" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || {
-            echo "::error::Stable tag $stable is not a final version. Release it first."
+          echo "$stable" | grep -qE '^[1-9][0-9]*\.[0-9]+\.[0-9]+$' || {
+            echo "::error::Stable tag $stable is not a listed version (1.0.0 or later). Release it first."
             exit 1
           }
           git rev-parse -q --verify "refs/tags/$stable" >/dev/null || {

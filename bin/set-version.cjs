@@ -2,8 +2,11 @@
 // Sets the plugin version in every place it appears.
 //
 // Usage: npm run set-version -- <version>
-//   1.0.0-rc.2   a release candidate (GitHub pre-release only)
-//   1.0.0        a final release (GitHub release and WordPress.org)
+//   0.9.1        a review candidate before the first listing (GitHub pre-release only)
+//   1.0.0        a release (GitHub release and WordPress.org)
+//
+// WordPress.org accepts only digits and dots in a plugin version, so there are no
+// "-rc" suffixes. Versions below 1.0.0 are the candidates.
 //
 // Updates the plugin header "Version", the NANOPOST_EMAIL_CHECK_VERSION constant and the
 // readme "Stable tag". The Release workflow requires all three to equal the tag.
@@ -13,8 +16,8 @@ const fs = require('fs');
 const path = require('path');
 
 const version = process.argv[2];
-if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(version || '')) {
-  console.error('Usage: npm run set-version -- <x.y.z or x.y.z-rc.N>');
+if (!/^\d+\.\d+\.\d+$/.test(version || '')) {
+  console.error('Usage: npm run set-version -- <x.y.z> (digits and dots only, as WordPress.org requires)');
   process.exit(1);
 }
 
