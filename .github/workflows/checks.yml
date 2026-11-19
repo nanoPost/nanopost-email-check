@@ -12,7 +12,7 @@ jobs:
     name: Coding standards
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -28,7 +28,7 @@ jobs:
     name: Plugin Check (release files)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Check exactly what ships: the tracked files that git archive puts in the zip.
       - name: Build release folder
@@ -45,7 +45,7 @@ jobs:
       - name: Build release zip
         run: git archive --format=zip --prefix=nanopost-email-check/ -o nanopost-email-check.zip HEAD
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: nanopost-email-check-zip
           path: nanopost-email-check.zip
@@ -75,9 +75,9 @@ jobs:
             php: '8.3'
             multisite: true
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
