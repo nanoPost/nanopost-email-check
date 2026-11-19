@@ -4,12 +4,21 @@
 # Security updates are separate (repository setting) and arrive as soon as an advisory
 # is published. package.json "overrides" pin patched transitive versions; remove an
 # override once @wordpress/env ships the fix itself.
+#
+# cooldown: version updates wait until a release is 14 days old (our rule for new
+# dependencies). Security updates are not delayed.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
+    ignore:
+      # Pinned to match the Chromium build cached for the screenshot tool. Update by hand,
+      # together with the browser download (npx playwright-core install chromium).
+      - dependency-name: playwright-core
     groups:
       npm-dev:
         patterns: ['*']
@@ -18,6 +27,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     groups:
       composer-dev:
         patterns: ['*']
@@ -26,6 +37,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     groups:
       actions:
         patterns: ['*']
