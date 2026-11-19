@@ -8,7 +8,7 @@
  * @package NanoPost_Email_Check
  */
 
-// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals, WordPress.DB.DirectDatabaseQuery -- Test file, not shipped.
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals, WordPress.DB.DirectDatabaseQuery, WordPress.Files.FileName, Universal.Files.SeparateFunctionsFromOO, WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Test file, not shipped.
 
 if ( ! defined( 'WP_CLI' ) ) {
 	exit;
@@ -91,6 +91,8 @@ function np_reset() {
 	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
 	delete_option( NanoPost_Email_Check_Scheduler::STATE_OPTION );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
+	global $wpdb;
+	delete_metadata( 'user', 0, $wpdb->get_blog_prefix() . NanoPost_Email_Check_Alerts::DISMISSED_META, '', true );
 }
 
 /**
@@ -122,14 +124,18 @@ $GLOBALS['np_requests'] = array();
 add_filter(
 	'pre_http_request',
 	static function ( $pre, $args, $url ) {
-		if ( 0 === strpos( $url, 'http://mailpit:' ) ) {
+		// Mailpit API calls, and tests of the real request, pass through.
+		if ( 0 === strpos( $url, 'http://mailpit:' ) || ! empty( $GLOBALS['np_http_passthrough'] ) ) {
 			return $pre;
 		}
 		$GLOBALS['np_requests'][] = array(
 			'url'  => $url,
 			'args' => $args,
 		);
-		$code                     = isset( $GLOBALS['np_http_code'] ) ? $GLOBALS['np_http_code'] : 204;
+		if ( ! empty( $GLOBALS['np_http_error'] ) ) {
+			return new WP_Error( 'http_request_failed', 'cURL error 28: Operation timed out' );
+		}
+		$code = isset( $GLOBALS['np_http_code'] ) ? $GLOBALS['np_http_code'] : 204;
 		return array(
 			'headers'  => array(),
 			'body'     => '',
@@ -458,6 +464,223 @@ NanoPost_Email_Check_Plugin::run_checks( 'manual' );
 remove_filter( 'pre_wp_mail', '__return_false' );
 $np_body = json_decode( end( $GLOBALS['np_requests'] )['args']['body'], true );
 np_assert( array( 'text' ) === array_keys( $np_body ), 'Google Chat gets only text', $np_body );
+
+// ---------------------------------------------------------------------------------------
+np_section( 'Security: capabilities and nonces' );
+np_reset();
+
+/**
+ * Thrown in place of wp_die() and redirects, which would end the test run.
+ */
+class NP_Test_Stop extends Exception {}
+
+add_filter(
+	'wp_die_handler',
+	static function () {
+		return static function ( $message, $title = '', $args = array() ) {
+			$code = is_array( $args ) && isset( $args['response'] ) ? (int) $args['response'] : 0;
+			throw new NP_Test_Stop( 'die:' . $code );
+		};
+	},
+	999
+);
+add_filter(
+	'wp_redirect',
+	static function ( $location ) {
+		throw new NP_Test_Stop( 'redirect:' . $location );
+	},
+	999
+);
+
+/**
+ * Call a handler and report how it ended: "die:<code>", "redirect:<url>" or "returned".
+ *
+ * @param callable $handler Handler.
+ * @return string
+ */
+function np_outcome( $handler ) {
+	try {
+		$handler();
+		return 'returned';
+	} catch ( NP_Test_Stop $e ) {
+		return $e->getMessage();
+	}
+}
+
+/**
+ * Set the request nonce, as a form or link would.
+ *
+ * @param string|null $nonce Nonce, or null for none.
+ */
+function np_nonce( $nonce ) {
+	unset( $_REQUEST['_wpnonce'], $_POST['_wpnonce'], $_GET['_wpnonce'] );
+	if ( null !== $nonce ) {
+		$_REQUEST['_wpnonce'] = $nonce;
+	}
+}
+
+$np_admin_id  = (int) get_users(
+	array(
+		'role'   => 'administrator',
+		'number' => 1,
+		'fields' => 'ID',
+	)
+)[0];
+$np_editor_id = wp_insert_user(
+	array(
+		'user_login' => 'np_sec_editor',
+		'user_pass'  => wp_generate_password(),
+		'role'       => 'editor',
+	)
+);
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_log_count = static function () {
+	return count( NanoPost_Email_Check_Log::all() );
+};
+
+wp_set_current_user( $np_editor_id );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::SEND_ACTION ) );
+np_assert( 'die:403' === np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_send' ) ), 'send: an editor is refused, even with a valid nonce' );
+np_assert( 0 === $np_log_count(), 'send: no check ran for the editor' );
+
+wp_set_current_user( $np_admin_id );
+np_nonce( null );
+np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_send' ) ), 'die:' ), 'send: no nonce is refused' );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Alerts::DISMISS_ACTION ) );
+np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_send' ) ), 'die:' ), 'send: a nonce for another action is refused' );
+np_assert( 0 === $np_log_count(), 'send: no check ran without a valid nonce' );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::SEND_ACTION ) );
+$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_send' ) );
+np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ), 'send: admin with a valid nonce runs and returns to the screen', $np_out );
+np_assert( 1 === $np_log_count(), 'send: one check ran' );
+remove_filter( 'pre_wp_mail', '__return_true' );
+
+// Dismiss.
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, 'x' ) );
+$np_key           = array_keys( NanoPost_Email_Check_Alerts::active() )[0];
+$_GET['alert']    = $np_key;
+$np_dismissed_for = static function ( $user_id ) {
+	return get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, $user_id );
+};
+
+wp_set_current_user( $np_editor_id );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Alerts::DISMISS_ACTION ) );
+np_assert( 'die:403' === np_outcome( array( 'NanoPost_Email_Check_Alerts', 'handle_dismiss' ) ), 'dismiss: an editor is refused' );
+np_assert( false === $np_dismissed_for( $np_editor_id ), 'dismiss: nothing stored for the editor' );
+
+wp_set_current_user( $np_admin_id );
+np_nonce( 'bad' );
+np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Alerts', 'handle_dismiss' ) ), 'die:' ), 'dismiss: a bad nonce is refused' );
+np_assert( false === $np_dismissed_for( $np_admin_id ), 'dismiss: nothing stored with a bad nonce' );
+
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Alerts::DISMISS_ACTION ) );
+$_GET['alert'] = 'failed:1; <script>';
+np_outcome( array( 'NanoPost_Email_Check_Alerts', 'handle_dismiss' ) );
+np_assert( false === $np_dismissed_for( $np_admin_id ), 'dismiss: an unknown alert key is not stored' );
+$_GET['alert'] = $np_key;
+np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Alerts', 'handle_dismiss' ) ), 'redirect:' ), 'dismiss: admin with a valid nonce goes back' );
+np_assert( array( $np_key ) === $np_dismissed_for( $np_admin_id ), 'dismiss: the active alert is stored', $np_dismissed_for( $np_admin_id ) );
+unset( $_GET['alert'] );
+np_nonce( null );
+
+np_assert( 'manage_options' === apply_filters( 'option_page_capability_' . NanoPost_Email_Check_Settings::GROUP, 'manage_options' ), 'settings: options.php requires manage_options' );
+np_assert( ! user_can( $np_editor_id, 'manage_options' ), 'settings: an editor cannot save them' );
+$np_registered = get_registered_settings();
+np_assert( isset( $np_registered[ NanoPost_Email_Check_Settings::OPTION ] ) && NanoPost_Email_Check_Settings::GROUP === $np_registered[ NanoPost_Email_Check_Settings::OPTION ]['group'], 'settings: registered in the plugin group only' );
+
+// ---------------------------------------------------------------------------------------
+np_section( 'Security: hostile stored values are escaped' );
+np_reset();
+$np_evil         = '"><script>alert(1)</script><img src=x onerror=alert(1)>\'';
+$np_bad_settings = static function () use ( $np_evil ) {
+	return array(
+		'recipient'   => $np_evil,
+		'interval'    => 'daily',
+		'webhook_url' => 'javascript:alert(1)//' . $np_evil,
+	);
+};
+add_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_bad_settings );
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'manual', true, '', $np_evil ) );
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, $np_evil, $np_evil ) );
+update_option(
+	NanoPost_Email_Check_Webhook::STATE_OPTION,
+	array(
+		'last_delivery' => array(
+			'time'   => time(),
+			'ok'     => false,
+			'detail' => $np_evil,
+		),
+	)
+);
+wp_set_current_user( $np_admin_id );
+NanoPost_Email_Check_Admin::register_settings();
+set_current_screen( 'dashboard' );
+ob_start();
+NanoPost_Email_Check_Alerts::render();
+NanoPost_Email_Check_Admin::render();
+$np_html = ob_get_clean();
+remove_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_bad_settings );
+
+np_assert( false !== strpos( $np_html, 'Recent results' ) && false !== strpos( $np_html, 'Email check failed.' ), 'screen and notice rendered' );
+// Parse the HTML as a browser would, and look for what the hostile text tried to create.
+$np_dom = new DOMDocument();
+libxml_use_internal_errors( true );
+$np_dom->loadHTML( '<!doctype html><html><body>' . $np_html . '</body></html>' );
+libxml_clear_errors();
+$np_xpath   = new DOMXPath( $np_dom );
+$np_scripts = 0;
+foreach ( $np_dom->getElementsByTagName( 'script' ) as $np_el ) {
+	$np_scripts += false !== strpos( $np_el->textContent, 'alert(1)' ) ? 1 : 0; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+}
+np_assert( 0 === $np_scripts, 'no <script> element from stored values' );
+np_assert( 0 === $np_xpath->query( '//img[@src="x"]' )->length, 'no <img> element from stored values' );
+np_assert( 0 === $np_xpath->query( '//@*[starts-with(translate(name(), "ON", "on"), "on")]' )->length, 'no event-handler attribute on any element' );
+np_assert( 0 === $np_xpath->query( '//a[starts-with(normalize-space(translate(@href, "JAVSCRIPT", "javscript")), "javascript:")]' )->length, 'no javascript: link' );
+np_assert( false !== strpos( $np_html, '&lt;script&gt;alert(1)&lt;/script&gt;' ), 'the hostile text is shown escaped' );
+
+// ---------------------------------------------------------------------------------------
+np_section( 'Security: webhook safety when sending' );
+np_reset();
+$np_webhook_url  = '';
+$np_fake_url_opt = static function () use ( &$np_webhook_url ) {
+	return array( 'webhook_url' => $np_webhook_url );
+};
+add_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_fake_url_opt );
+$np_fail = new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, 'boom' );
+
+// The real request, no capture: wp_safe_remote_post() must refuse these at send time,
+// even though the settings check was skipped.
+$GLOBALS['np_http_passthrough'] = true;
+foreach ( array( 'http://127.0.0.1/hook', 'http://mailpit:8025/api/v1/info' ) as $np_url ) {
+	$np_webhook_url = $np_url;
+	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+	NanoPost_Email_Check_Webhook::on_result( $np_fail );
+	$np_d = NanoPost_Email_Check_Webhook::state()['last_delivery'];
+	np_assert( empty( $np_d['ok'] ) && '' !== (string) ( $np_d['detail'] ?? '' ), 'refused at send time: ' . $np_url, $np_d );
+	np_assert( array() === NanoPost_Email_Check_Webhook::state()['last_status'], 'a refused message is not counted as sent: ' . $np_url );
+}
+np_assert( null !== np_mailpit( 'GET', 'info' ), 'the same private host answers a normal request (so the refusal is the safety check)' );
+$GLOBALS['np_http_passthrough'] = false;
+
+// The request asks WordPress to refuse unsafe URLs, which core also applies to redirects.
+$np_webhook_url = 'https://hooks.slack.com/services/T/B/x';
+delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+$np_n = count( $GLOBALS['np_requests'] );
+NanoPost_Email_Check_Webhook::on_result( $np_fail );
+$np_args = end( $GLOBALS['np_requests'] )['args'];
+np_assert( ! empty( $np_args['reject_unsafe_urls'] ), 'request is made with reject_unsafe_urls (covers redirects)' );
+np_assert( isset( $np_args['timeout'] ) && $np_args['timeout'] <= 5, 'request has a short timeout' );
+
+// A network error is a failed delivery, and the message is sent again next time.
+$GLOBALS['np_http_error'] = true;
+delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+NanoPost_Email_Check_Webhook::on_result( $np_fail );
+$np_d = NanoPost_Email_Check_Webhook::state()['last_delivery'];
+np_assert( empty( $np_d['ok'] ) && false !== strpos( $np_d['detail'], 'timed out' ), 'network error recorded as a failed delivery', $np_d );
+np_assert( array() === NanoPost_Email_Check_Webhook::state()['last_status'], 'network error: not counted as sent' );
+$GLOBALS['np_http_error'] = false;
+remove_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_fake_url_opt );
+wp_set_current_user( 0 );
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Help links' );
