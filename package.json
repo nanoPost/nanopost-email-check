@@ -6,11 +6,13 @@
 	"scripts": {
 		"env:start": "wp-env start",
 		"env:stop": "wp-env stop",
-		"plugin-check": "wp-env run cli wp plugin check nanopost-email-check --exclude-directories=dist,vendor,node_modules,.github,tests,.wordpress-org --exclude-files=.wp-env.json,.wp-env.override.json,.gitattributes,.gitignore,phpcs.xml.dist,composer.json,composer.lock,package.json,package-lock.json,CLAUDE.md",
+		"plugin-check": "wp-env run cli wp plugin check nanopost-email-check --exclude-directories=dist,vendor,node_modules,.github,tests,.wordpress-org,screenshots --exclude-files=.wp-env.json,.wp-env.override.json,.gitattributes,.gitignore,phpcs.xml.dist,composer.json,composer.lock,package.json,package-lock.json,CLAUDE.md",
 		"zip": "mkdir -p dist && git archive --format=zip --prefix=nanopost-email-check/ -o dist/nanopost-email-check.zip HEAD",
-		"test": "bash tests/run.sh"
+		"test": "bash tests/run.sh",
+		"screenshots": "node screenshots/shoot.cjs"
 	},
 	"devDependencies": {
-		"@wordpress/env": "12.0.0"
+		"@wordpress/env": "12.0.0",
+		"playwright-core": "1.63.0"
 	}
 }

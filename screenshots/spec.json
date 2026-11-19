@@ -1,0 +1,137 @@
+{
+	"comment": "Screenshot spec. One entry per image. See screenshots/README.md.",
+	"before": [
+		"wp plugin deactivate plugin-check.latest-stable --quiet"
+	],
+	"after": [
+		"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php reset",
+		"wp plugin activate plugin-check.latest-stable --quiet"
+	],
+	"defaults": {
+		"hide": [
+			"#wp-admin-bar-updates",
+			"#wp-admin-bar-comments",
+			"#wpfooter",
+			"#screen-meta-links",
+			".update-nag",
+			"#adminmenu .update-plugins",
+			"#adminmenu .awaiting-mod"
+		],
+		"pad": 16,
+		"scale": 2
+	},
+	"shots": [
+		{
+			"id": "wporg-1",
+			"out": ".wordpress-org/screenshot-1.png",
+			"width": 1280,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main"
+			],
+			"full": true,
+			"caption": "The plugin screen at Tools > Email Check: status, settings, and the result log.",
+			"alt": "The Email Check screen in wp-admin with status, settings and a table of recent results."
+		},
+		{
+			"id": "wporg-2",
+			"out": ".wordpress-org/screenshot-2.png",
+			"width": 1280,
+			"path": "/wp-admin/index.php",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php failed"
+			],
+			"top": true,
+			"to": "#nanopost-email-check-notice-failed",
+			"pad": 24,
+			"caption": "The notice in wp-admin when a check fails, with a link to decode the error.",
+			"alt": "A red admin notice on the Dashboard: Email check failed, with the SMTP error and links."
+		},
+		{
+			"id": "wporg-3",
+			"out": ".wordpress-org/screenshot-3.png",
+			"width": 1280,
+			"path": "/wp-admin/index.php",
+			"setup": [
+				"wp config set DISABLE_WP_CRON true --raw",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php stale"
+			],
+			"teardown": [
+				"wp config delete DISABLE_WP_CRON"
+			],
+			"top": true,
+			"to": "#nanopost-email-check-notice-stale",
+			"pad": 24,
+			"caption": "The notice when scheduled checks have stopped running.",
+			"alt": "A yellow admin notice on the Dashboard: Email checks have stopped, with a WP-Cron note and links."
+		},
+		{
+			"id": "help-status-settings",
+			"out": "screenshots/help/status-settings.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-status",
+			"to": "#nanopost-email-check-settings",
+			"caption": "Status and settings on the Email Check screen.",
+			"alt": "Last check passed, daily schedule, recipient field, schedule choice and a Slack webhook URL."
+		},
+		{
+			"id": "help-log",
+			"out": "screenshots/help/log.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-log",
+			"to": "#nanopost-email-check-log",
+			"caption": "The result log: passing checks, and a failure with its SMTP error.",
+			"alt": "A table of recent results. Two rows failed with SMTP Error: Could not authenticate; the rest passed."
+		},
+		{
+			"id": "help-notice-failed",
+			"out": "screenshots/help/notice-failed.webp",
+			"width": 1000,
+			"path": "/wp-admin/index.php",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php failed"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-notice-failed",
+			"to": "#nanopost-email-check-notice-failed",
+			"caption": "The notice when a check fails.",
+			"alt": "Admin notice: Email check failed, with the error text and links to the error page, the results and Dismiss."
+		},
+		{
+			"id": "help-notice-stale",
+			"out": "screenshots/help/notice-stale.webp",
+			"width": 1000,
+			"path": "/wp-admin/index.php",
+			"setup": [
+				"wp config set DISABLE_WP_CRON true --raw",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php stale"
+			],
+			"teardown": [
+				"wp config delete DISABLE_WP_CRON"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-notice-stale",
+			"to": "#nanopost-email-check-notice-stale",
+			"caption": "The notice when scheduled checks have stopped.",
+			"alt": "Admin notice: Email checks have stopped, with a DISABLE_WP_CRON note and links."
+		}
+	]
+}
