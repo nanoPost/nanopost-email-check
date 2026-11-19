@@ -208,16 +208,24 @@ class NanoPost_Email_Check_Admin {
 		// "Settings saved." message (stored under "general") shows too.
 		settings_errors();
 		self::render_send_notice();
+		// Section ids are stable hooks for styling, tests and documentation screenshots.
+		echo '<div id="nanopost-email-check-status">';
 		self::render_status();
+		echo '</div>';
 
-		echo '<form method="post" action="' . esc_url( admin_url( 'options.php' ) ) . '">';
+		echo '<form id="nanopost-email-check-settings" method="post" action="' . esc_url( admin_url( 'options.php' ) ) . '">';
 		settings_fields( NanoPost_Email_Check_Settings::GROUP );
 		do_settings_sections( self::PAGE );
 		submit_button();
 		echo '</form>';
 
+		echo '<div id="nanopost-email-check-send">';
 		self::render_send_form();
+		echo '</div>';
+
+		echo '<div id="nanopost-email-check-log">';
 		self::render_log();
+		echo '</div>';
 
 		echo '</div>';
 	}

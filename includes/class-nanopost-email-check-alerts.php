@@ -163,7 +163,7 @@ class NanoPost_Email_Check_Alerts {
 	private static function render_failed( $key ) {
 		$result = self::failed_result();
 
-		echo '<div class="notice notice-error"><p>';
+		echo '<div id="nanopost-email-check-notice-failed" class="notice notice-error"><p>';
 		echo '<strong>' . esc_html__( 'Email check failed.', 'nanopost-email-check' ) . '</strong> ';
 		echo esc_html(
 			sprintf(
@@ -190,7 +190,7 @@ class NanoPost_Email_Check_Alerts {
 	 * @param string $key Alert key.
 	 */
 	private static function render_stale( $key ) {
-		echo '<div class="notice notice-warning"><p>';
+		echo '<div id="nanopost-email-check-notice-stale" class="notice notice-warning"><p>';
 		echo '<strong>' . esc_html__( 'Email checks have stopped.', 'nanopost-email-check' ) . '</strong> ';
 		echo esc_html(
 			sprintf(
