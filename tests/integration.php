@@ -8,7 +8,7 @@
  * @package NanoPost_Email_Check
  */
 
-// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals -- Test file, not shipped.
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals, WordPress.DB.DirectDatabaseQuery -- Test file, not shipped.
 
 if ( ! defined( 'WP_CLI' ) ) {
 	exit;
@@ -93,11 +93,29 @@ function np_reset() {
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 }
 
-// Keep the developer's own state.
-$np_saved = array();
-foreach ( array( NanoPost_Email_Check_Settings::OPTION, NanoPost_Email_Check_Log::OPTION, NanoPost_Email_Check_Webhook::STATE_OPTION, NanoPost_Email_Check_Scheduler::STATE_OPTION ) as $np_option ) {
-	$np_saved[ $np_option ] = get_option( $np_option, null );
+/**
+ * A fingerprint of the state the tests touch: every option, user meta and the cron array.
+ *
+ * @return string
+ */
+function np_fingerprint() {
+	global $wpdb;
+	$options = $wpdb->get_results( "SELECT option_name, option_value FROM $wpdb->options WHERE option_name NOT LIKE '\\_transient\\_%' AND option_name NOT LIKE '\\_site\\_transient\\_%' ORDER BY option_name", ARRAY_N );
+	$meta    = $wpdb->get_results( "SELECT user_id, meta_key, meta_value FROM $wpdb->usermeta ORDER BY umeta_id", ARRAY_N );
+	$users   = $wpdb->get_col( "SELECT ID FROM $wpdb->users ORDER BY ID" );
+	return md5( wp_json_encode( array( $options, $meta, $users ) ) );
 }
+
+// Isolation: everything runs in one database transaction that is rolled back at the end.
+// If PHP dies before that, MySQL rolls back when the connection closes.
+global $wpdb;
+$np_engines = $wpdb->get_col( "SELECT DISTINCT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('$wpdb->options', '$wpdb->usermeta', '$wpdb->users')" );
+if ( array( 'InnoDB' ) !== $np_engines ) {
+	WP_CLI::error( 'Tests need InnoDB tables for the rollback. Found: ' . implode( ', ', $np_engines ) );
+}
+wp_cache_flush();
+$np_state_before = np_fingerprint();
+$wpdb->query( 'START TRANSACTION' );
 
 // Capture webhook requests. Mailpit API calls pass through.
 $GLOBALS['np_requests'] = array();
@@ -292,7 +310,7 @@ np_assert( 30 === count( $np_all ), 'keeps 30 results', count( $np_all ) );
 np_assert( 1035 === $np_all[0]->time && 1006 === $np_all[29]->time, 'newest first, oldest dropped' );
 np_assert( 1035 === NanoPost_Email_Check_Log::latest()->time, 'latest() is the newest' );
 global $wpdb;
-$np_autoload = $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM $wpdb->options WHERE option_name = %s", NanoPost_Email_Check_Log::OPTION ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+$np_autoload = $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM $wpdb->options WHERE option_name = %s", NanoPost_Email_Check_Log::OPTION ) );
 np_assert( in_array( $np_autoload, array( 'no', 'off' ), true ), 'log option does not autoload', $np_autoload );
 
 // ---------------------------------------------------------------------------------------
@@ -459,21 +477,17 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 }
 require NANOPOST_EMAIL_CHECK_DIR . 'uninstall.php';
 wp_cache_flush();
-$np_left = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->options WHERE option_name LIKE 'nanopost\\_email\\_check%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+$np_left = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->options WHERE option_name LIKE 'nanopost\\_email\\_check%'" );
 np_assert( 0 === $np_left, 'no options left', $np_left );
 np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'no dismissed-notice user option left' );
 np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'no scheduled event left' );
 
 // ---------------------------------------------------------------------------------------
-// Put the developer's state back, and keep the event scheduled.
-foreach ( $np_saved as $np_option => $np_value ) {
-	if ( null === $np_value ) {
-		delete_option( $np_option );
-	} else {
-		update_option( $np_option, $np_value, NanoPost_Email_Check_Log::OPTION === $np_option || NanoPost_Email_Check_Webhook::STATE_OPTION === $np_option ? false : null );
-	}
-}
-NanoPost_Email_Check_Scheduler::ensure_scheduled();
+// ---------------------------------------------------------------------------------------
+np_section( 'Isolation' );
+$wpdb->query( 'ROLLBACK' );
+wp_cache_flush();
+np_assert( np_fingerprint() === $np_state_before, 'the site is exactly as before the run (options, user meta, users, cron)' );
 
 WP_CLI::log( '' );
 if ( $GLOBALS['np_failures'] > 0 ) {
