@@ -70,7 +70,7 @@ Yes. Enter a webhook URL on the plugin screen. Slack and Google Chat incoming we
 
 = Does it work on multisite? =
 
-Yes. Each site runs its own checks, with its own settings, log and notices. When the plugin is network-activated, each site schedules its checks the first time an administrator opens wp-admin on that site.
+Yes. Each site runs its own checks, with its own settings, log and notices. When the plugin is network-activated, each site schedules its checks the first time an administrator opens wp-admin on that site. On a network where all sites use the same mail setup, activating the plugin on the main site is enough: network activation then sends one test email per site, which repeats the same check.
 
 = What happens to the data when I delete the plugin? =
 
