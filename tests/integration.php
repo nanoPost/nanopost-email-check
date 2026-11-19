@@ -259,7 +259,7 @@ if ( $np_mailpit_up ) {
 	$np_results = NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_MANUAL );
 	np_assert( ! $np_results[0]->passed, 'check fails when SMTP is down' );
 	np_assert( false !== stripos( $np_results[0]->error, 'connect' ), 'error text comes from wp_mail_failed', $np_results[0]->error );
-	np_assert( 0 === strpos( NanoPost_Email_Check_Help::for_failure( $np_results[0] ), 'https://nanopo.st/email-check/error/#error=' ), 'failure with text links to the decoder' );
+	np_assert( 0 === strpos( NanoPost_Email_Check_Help::for_failure( $np_results[0] ), 'https://nanopo.st/email-check-plugin/error/#error=' ), 'failure with text links to the decoder' );
 
 	remove_all_actions( 'phpmailer_init' );
 }
@@ -402,8 +402,8 @@ np_assert( array( 'text' ) === array_keys( $np_body ), 'Google Chat gets only te
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Help links' );
-np_assert( 'https://nanopo.st/email-check/error/#error=SMTP%20Error%3A%20x%26y' === NanoPost_Email_Check_Help::error( 'SMTP Error: x&y' ), 'error text is rawurlencoded after #' );
-np_assert( strlen( rawurldecode( substr( NanoPost_Email_Check_Help::error( str_repeat( 'a', 5000 ) ), strlen( 'https://nanopo.st/email-check/error/#error=' ) ) ) ) === 4000, 'error text is cut at 4,000 characters' );
+np_assert( 'https://nanopo.st/email-check-plugin/error/#error=SMTP%20Error%3A%20x%26y' === NanoPost_Email_Check_Help::error( 'SMTP Error: x&y' ), 'error text is rawurlencoded after #' );
+np_assert( strlen( rawurldecode( substr( NanoPost_Email_Check_Help::error( str_repeat( 'a', 5000 ) ), strlen( 'https://nanopo.st/email-check-plugin/error/#error=' ) ) ) ) === 4000, 'error text is cut at 4,000 characters' );
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );

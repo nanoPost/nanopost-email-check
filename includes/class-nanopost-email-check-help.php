@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 class NanoPost_Email_Check_Help {
 
-	const BASE = 'https://nanopo.st/email-check/';
+	const BASE = 'https://nanopo.st/email-check-plugin/';
 
 	/**
 	 * The error decoder reads at most this many characters.

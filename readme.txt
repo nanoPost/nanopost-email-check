@@ -34,7 +34,7 @@ A pass means the mail system WordPress uses accepted the message. It does not pr
 
 The plugin screen is at **Tools > Email Check**.
 
-Full documentation: [nanopo.st/email-check](https://nanopo.st/email-check/). Source code: [GitHub](https://github.com/nanoPost/nanopost-email-check).
+Full documentation: [nanopo.st/email-check-plugin](https://nanopo.st/email-check-plugin/). Source code: [GitHub](https://github.com/nanoPost/nanopost-email-check).
 
 == Installation ==
 

@@ -4,7 +4,7 @@ A WordPress plugin that checks that your site can still send email. It sends a t
 a schedule, logs each result, and warns you in wp-admin when a check fails or when the checks
 stop running. An optional webhook sends failures to Slack, Google Chat or any other receiver.
 
-- Documentation: https://nanopo.st/email-check/
+- Documentation: https://nanopo.st/email-check-plugin/
 - License: GPLv2 or later
 
 `readme.txt` is the full description used by WordPress.org.
