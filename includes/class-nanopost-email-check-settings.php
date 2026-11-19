@@ -119,8 +119,10 @@ class NanoPost_Email_Check_Settings {
 		$output = self::get();
 
 		if ( isset( $input['recipient'] ) && is_scalar( $input['recipient'] ) ) {
-			$raw       = trim( (string) $input['recipient'] );
-			$recipient = sanitize_email( $raw );
+			$raw = trim( (string) $input['recipient'] );
+			// Accept the address only as typed: sanitize_email() would silently turn
+			// "first last@example.org" into a different address.
+			$recipient = is_email( $raw ) && sanitize_email( $raw ) === $raw ? $raw : '';
 
 			if ( '' === $raw ) {
 				$output['recipient'] = '';
@@ -138,7 +140,8 @@ class NanoPost_Email_Check_Settings {
 
 		if ( isset( $input['webhook_url'] ) && is_scalar( $input['webhook_url'] ) ) {
 			$raw = trim( (string) $input['webhook_url'] );
-			$url = esc_url_raw( $raw, array( 'https', 'http' ) );
+			// Accept the URL only as typed: esc_url_raw() silently drops characters it rejects.
+			$url = esc_url_raw( $raw, array( 'https', 'http' ) ) === $raw ? $raw : '';
 
 			if ( '' === $raw ) {
 				$output['webhook_url'] = '';

@@ -72,17 +72,19 @@ class NanoPost_Email_Check_Alerts {
 	}
 
 	/**
-	 * When scheduled checks have stopped: the time the missed check was due. Null when
-	 * checks run on time.
+	 * When scheduled checks have stopped: the time since which no scheduled check has
+	 * finished. Null when checks run on time.
 	 *
-	 * The event is overdue by more than one interval, so the last scheduled check is older
-	 * than twice the interval.
+	 * Stopped means no scheduled check finished for more than twice the interval, counted
+	 * from the last finished check or, before the first one, from the start of the schedule.
+	 * This covers WP-Cron not running, and checks that start but crash (WP-Cron books the
+	 * next run before it runs the check, so a crash leaves a future event).
 	 *
 	 * @return int|null Unix time.
 	 */
 	public static function stale_since() {
-		$next = NanoPost_Email_Check_Scheduler::next_run();
-		if ( ! $next ) {
+		$baseline = max( NanoPost_Email_Check_Scheduler::last_completed(), NanoPost_Email_Check_Scheduler::scheduled_since() );
+		if ( 0 === $baseline ) {
 			return null;
 		}
 
@@ -93,7 +95,7 @@ class NanoPost_Email_Check_Alerts {
 		}
 
 		$interval = NanoPost_Email_Check_Scheduler::current_interval_seconds();
-		return ( time() - $next > $interval ) ? (int) $next : null;
+		return ( time() - $baseline > 2 * $interval ) ? $baseline : null;
 	}
 
 	/**
@@ -195,7 +197,7 @@ class NanoPost_Email_Check_Alerts {
 		echo esc_html(
 			sprintf(
 				/* translators: %s: date and time. */
-				__( 'A scheduled email check was due on %s and has not run. WP-Cron may not be running on this site.', 'nanopost-email-check' ),
+				__( 'No scheduled email check has finished since %s. WP-Cron may not be running on this site, or the check may be stopping with a PHP error.', 'nanopost-email-check' ),
 				NanoPost_Email_Check_Admin::format_date( (int) self::stale_since() )
 			)
 		);

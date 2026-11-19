@@ -290,7 +290,7 @@ class NanoPost_Email_Check_Admin {
 			echo esc_html(
 				sprintf(
 					/* translators: %s: date and time. */
-					__( 'A check was due on %s and has not run. WP-Cron may not be running.', 'nanopost-email-check' ),
+					__( 'No scheduled check has finished since %s. WP-Cron may not be running, or the check may be stopping with a PHP error.', 'nanopost-email-check' ),
 					self::format_date( $stale )
 				)
 			);

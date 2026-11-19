@@ -23,6 +23,7 @@ if ( 'reset' === $scene ) {
 	delete_option( NanoPost_Email_Check_Log::OPTION );
 	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
 	delete_option( NanoPost_Email_Check_Settings::OPTION );
+	delete_option( NanoPost_Email_Check_Scheduler::STATE_OPTION );
 	delete_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META );
 	NanoPost_Email_Check_Scheduler::reschedule();
 	WP_CLI::success( 'Scene reset.' );
@@ -94,5 +95,14 @@ update_option(
 wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 $next = 'stale' === $scene ? $last - $day : $last + $day;
 wp_schedule_event( $next, 'daily', NanoPost_Email_Check_Scheduler::HOOK );
+
+// The last finished scheduled check: the newest scheduled row in the log.
+update_option(
+	NanoPost_Email_Check_Scheduler::STATE_OPTION,
+	array(
+		'since'          => $last - 11 * $day,
+		'last_completed' => 'stale' === $scene ? $last - 2 * $day : $last,
+	)
+);
 
 WP_CLI::success( "Scene $scene ready." );

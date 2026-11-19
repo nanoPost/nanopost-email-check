@@ -89,12 +89,13 @@ function np_reset() {
 	delete_option( NanoPost_Email_Check_Settings::OPTION );
 	delete_option( NanoPost_Email_Check_Log::OPTION );
 	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
+	delete_option( NanoPost_Email_Check_Scheduler::STATE_OPTION );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 }
 
 // Keep the developer's own state.
 $np_saved = array();
-foreach ( array( NanoPost_Email_Check_Settings::OPTION, NanoPost_Email_Check_Log::OPTION, NanoPost_Email_Check_Webhook::STATE_OPTION ) as $np_option ) {
+foreach ( array( NanoPost_Email_Check_Settings::OPTION, NanoPost_Email_Check_Log::OPTION, NanoPost_Email_Check_Webhook::STATE_OPTION, NanoPost_Email_Check_Scheduler::STATE_OPTION ) as $np_option ) {
 	$np_saved[ $np_option ] = get_option( $np_option, null );
 }
 
@@ -141,6 +142,10 @@ np_assert( 'weekly' === $np['interval'], 'valid interval is kept', $np );
 update_option( NanoPost_Email_Check_Settings::OPTION, $np );
 $np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => 'not-an-email' ) );
 np_assert( 'owner@example.com' === $np['recipient'], 'invalid recipient keeps the saved one', $np );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => 'first last@example.org' ) );
+np_assert( 'owner@example.com' === $np['recipient'], 'address with a space is refused, not changed', $np );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => 'first.last+tag@example.org' ) );
+np_assert( 'first.last+tag@example.org' === $np['recipient'], 'valid address with + is kept as typed', $np );
 
 $np = NanoPost_Email_Check_Settings::sanitize( array( 'interval' => 'hourly' ) );
 np_assert( 'daily' === $np['interval'], 'unknown interval becomes daily', $np );
@@ -150,12 +155,14 @@ np_assert( '' === $np['recipient'], 'empty recipient is allowed', $np );
 update_option( NanoPost_Email_Check_Settings::OPTION, $np );
 np_assert( get_option( 'admin_email' ) === NanoPost_Email_Check_Settings::recipient(), 'empty recipient falls back to admin email' );
 
-foreach ( array( 'http://127.0.0.1/x', 'http://10.0.0.5/x', 'ftp://example.com/x', 'nonsense' ) as $np_url ) {
+foreach ( array( 'http://127.0.0.1/x', 'http://10.0.0.5/x', 'ftp://example.com/x', 'nonsense', 'https://hooks.slack.com/serv ices/x', 'hooks.slack.com/services/x' ) as $np_url ) {
 	$np = NanoPost_Email_Check_Settings::sanitize( array( 'webhook_url' => $np_url ) );
 	np_assert( '' === $np['webhook_url'], 'webhook URL refused: ' . $np_url, $np['webhook_url'] );
 }
 $np = NanoPost_Email_Check_Settings::sanitize( array( 'webhook_url' => 'https://hooks.slack.com/services/T/B/x' ) );
 np_assert( 'https://hooks.slack.com/services/T/B/x' === $np['webhook_url'], 'public https webhook URL accepted', $np );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'webhook_url' => 'https://chat.googleapis.com/v1/spaces/X/messages?key=k&token=t' ) );
+np_assert( 'https://chat.googleapis.com/v1/spaces/X/messages?key=k&token=t' === $np['webhook_url'], 'URL with a query string is kept as typed', $np );
 
 // Simulate bad stored values (the sanitize callback would stop them on a normal save).
 $np_bad = static function () {
@@ -296,16 +303,39 @@ np_assert( null !== NanoPost_Email_Check_Alerts::failed_result(), 'failed latest
 NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', true ) );
 np_assert( null === NanoPost_Email_Check_Alerts::failed_result(), 'a pass clears it' );
 
+/**
+ * Set the schedule state directly.
+ *
+ * @param int $since          Schedule start.
+ * @param int $last_completed Last finished scheduled check.
+ */
+function np_schedule_state( $since, $last_completed ) {
+	update_option(
+		NanoPost_Email_Check_Scheduler::STATE_OPTION,
+		array(
+			'since'          => $since,
+			'last_completed' => $last_completed,
+		)
+	);
+}
+
 NanoPost_Email_Check_Alerts::remember_cron_lock();
 wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', NanoPost_Email_Check_Scheduler::HOOK );
-np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'event in the future is not stale' );
-wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
-wp_schedule_event( time() - HOUR_IN_SECONDS, 'daily', NanoPost_Email_Check_Scheduler::HOOK );
-np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'event overdue by less than one interval is not stale' );
-wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
-wp_schedule_event( time() - DAY_IN_SECONDS - HOUR_IN_SECONDS, 'daily', NanoPost_Email_Check_Scheduler::HOOK );
-np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'event overdue by more than one interval is stale' );
+np_schedule_state( time() - 9 * DAY_IN_SECONDS, time() - 23 * HOUR_IN_SECONDS );
+np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'last check finished within the interval: not stale' );
+np_schedule_state( time() - 9 * DAY_IN_SECONDS, time() - 47 * HOUR_IN_SECONDS );
+np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'last check under twice the interval ago: not stale' );
+np_schedule_state( time() - 9 * DAY_IN_SECONDS, time() - 3 * DAY_IN_SECONDS );
+np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'checks crash: event still in the future, but stale' );
+np_assert( time() - 3 * DAY_IN_SECONDS === NanoPost_Email_Check_Alerts::stale_since(), 'stale since the last finished check' );
 np_assert( 1 === count( NanoPost_Email_Check_Alerts::active() ), 'one active alert', NanoPost_Email_Check_Alerts::active() );
+
+np_schedule_state( time() - DAY_IN_SECONDS, 0 );
+np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'grace period before the first scheduled check' );
+np_schedule_state( time() - 3 * DAY_IN_SECONDS, 0 );
+np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'first check never finished: stale after twice the interval' );
+
+np_schedule_state( time() - 9 * DAY_IN_SECONDS, time() - 3 * DAY_IN_SECONDS );
 NanoPost_Email_Check_Alerts::remember_cron_lock();
 np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'an old WP-Cron lock does not hide it' );
 set_transient( 'doing_cron', sprintf( '%.22F', microtime( true ) ) );
@@ -313,6 +343,17 @@ np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'not stale on th
 NanoPost_Email_Check_Alerts::remember_cron_lock();
 np_assert( null !== NanoPost_Email_Check_Alerts::stale_since(), 'stale again on the next page load if WP-Cron did not run' );
 delete_transient( 'doing_cron' );
+
+add_filter( 'pre_wp_mail', '__return_true' );
+NanoPost_Email_Check_Scheduler::run();
+remove_filter( 'pre_wp_mail', '__return_true' );
+np_assert( abs( NanoPost_Email_Check_Scheduler::last_completed() - time() ) < 5, 'a finished scheduled run records its time' );
+np_assert( null === NanoPost_Email_Check_Alerts::stale_since(), 'a finished run clears the stale state' );
+
+wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
+delete_option( NanoPost_Email_Check_Scheduler::STATE_OPTION );
+NanoPost_Email_Check_Scheduler::ensure_scheduled();
+np_assert( abs( NanoPost_Email_Check_Scheduler::scheduled_since() - time() ) < 5, 'scheduling records the start of the grace period' );
 
 np_reset();
 NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'other_check', 'scheduled', false, 'broken' ) );
@@ -410,6 +451,7 @@ np_section( 'Uninstall' );
 update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'x@example.com' ) );
 NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'manual', true ) );
 update_option( NanoPost_Email_Check_Webhook::STATE_OPTION, array( 'last_status' => array() ) );
+np_schedule_state( time(), time() );
 update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {

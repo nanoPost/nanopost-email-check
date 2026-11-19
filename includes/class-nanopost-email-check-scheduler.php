@@ -12,7 +12,8 @@ defined( 'ABSPATH' ) || exit;
  */
 class NanoPost_Email_Check_Scheduler {
 
-	const HOOK = 'nanopost_email_check_run';
+	const HOOK         = 'nanopost_email_check_run';
+	const STATE_OPTION = 'nanopost_email_check_schedule_state';
 
 	/**
 	 * Register hooks.
@@ -64,7 +65,10 @@ class NanoPost_Email_Check_Scheduler {
 		}
 
 		$interval = NanoPost_Email_Check_Settings::interval();
-		wp_schedule_event( time() + self::interval_seconds( $interval ), $interval, self::HOOK );
+		if ( wp_schedule_event( time() + self::interval_seconds( $interval ), $interval, self::HOOK ) ) {
+			// Start of the grace period before the first scheduled check is due.
+			self::update_state( 'since', time() );
+		}
 	}
 
 	/**
@@ -94,6 +98,54 @@ class NanoPost_Email_Check_Scheduler {
 	 */
 	public static function run() {
 		NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_SCHEDULED );
+		// Only reached when the checks finished. WP-Cron has already booked the next run,
+		// so a crash here leaves a future event but no new time.
+		self::update_state( 'last_completed', time() );
+	}
+
+	/**
+	 * Unix time of the last scheduled run that finished, or 0.
+	 *
+	 * @return int
+	 */
+	public static function last_completed() {
+		return self::state()['last_completed'];
+	}
+
+	/**
+	 * Unix time the current schedule started, or 0.
+	 *
+	 * @return int
+	 */
+	public static function scheduled_since() {
+		return self::state()['since'];
+	}
+
+	/**
+	 * Stored schedule state.
+	 *
+	 * @return array{since:int, last_completed:int}
+	 */
+	private static function state() {
+		$state = get_option( self::STATE_OPTION, array() );
+		$state = is_array( $state ) ? $state : array();
+
+		return array(
+			'since'          => isset( $state['since'] ) ? (int) $state['since'] : 0,
+			'last_completed' => isset( $state['last_completed'] ) ? (int) $state['last_completed'] : 0,
+		);
+	}
+
+	/**
+	 * Set one value in the schedule state.
+	 *
+	 * @param string $key   "since" or "last_completed".
+	 * @param int    $value Unix time.
+	 */
+	private static function update_state( $key, $value ) {
+		$state         = self::state();
+		$state[ $key ] = (int) $value;
+		update_option( self::STATE_OPTION, $state );
 	}
 
 	/**
