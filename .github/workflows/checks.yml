@@ -1,8 +1,12 @@
 name: Checks
 
 on:
+  # Branches only: a version tag runs these checks through the Release workflow instead.
   push:
+    branches: ['**']
   pull_request:
+  # Called by the Release workflow, so a release needs passing checks on the tagged commit.
+  workflow_call:
 
 permissions:
   contents: read

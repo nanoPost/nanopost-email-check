@@ -9,7 +9,8 @@
 		"plugin-check": "wp-env run cli wp plugin check nanopost-email-check --exclude-directories=dist,vendor,node_modules,.github,tests,.wordpress-org,screenshots --exclude-files=.wp-env.json,.wp-env.override.json,.gitattributes,.gitignore,phpcs.xml.dist,composer.json,composer.lock,package.json,package-lock.json,CLAUDE.md",
 		"zip": "mkdir -p dist && git archive --format=zip --prefix=nanopost-email-check/ -o dist/nanopost-email-check.zip HEAD",
 		"test": "bash tests/run.sh",
-		"screenshots": "node screenshots/shoot.cjs"
+		"screenshots": "node screenshots/shoot.cjs",
+		"set-version": "node bin/set-version.cjs"
 	},
 	"devDependencies": {
 		"@wordpress/env": "12.1.0",

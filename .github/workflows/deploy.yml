@@ -1,11 +1,13 @@
 name: Release
 
-# Runs when a version tag is pushed.
+# Runs when a version tag is pushed. Set the version first: npm run set-version -- <version>
 #
-# - Every version tag (1.0.0, or a pre-release such as 1.0.0-rc.1) gets a GitHub Release
-#   with the plugin zip attached.
-# - A final version tag (1.0.0, no suffix) is also deployed to WordPress.org. That needs
-#   the repository secrets SVN_USERNAME and SVN_PASSWORD (the WordPress.org account).
+# - The full checks (coding standards, Plugin Check, integration tests) run on the tagged
+#   commit first. Nothing is published unless they pass.
+# - Every version tag (1.0.0, or a release candidate such as 1.0.0-rc.2) gets a GitHub
+#   Release with the plugin zip. Release candidates are marked as pre-releases.
+# - A final version tag (no suffix) is also deployed to WordPress.org. That needs the
+#   repository secrets SVN_USERNAME and SVN_PASSWORD (the WordPress.org account).
 #
 # The zip is built with git archive, so .gitattributes export-ignore decides what ships.
 # WordPress.org listing images come from .wordpress-org/.
@@ -16,29 +18,41 @@ on:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
 
+permissions:
+  contents: read
+
 jobs:
+  checks:
+    name: Checks
+    uses: ./.github/workflows/checks.yml
+
   release:
     name: GitHub Release
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
 
-      - name: Tag must match the plugin version and the stable tag
+      - name: Tag must equal the plugin version, the constant and the stable tag
         run: |
           tag="${GITHUB_REF_NAME}"
-          version="${tag%%-*}"
           header="$(grep -m1 -E '^ \* Version:' nanopost-email-check.php | awk '{print $NF}')"
+          constant="$(grep -m1 -oE "NANOPOST_EMAIL_CHECK_VERSION', '[^']+'" nanopost-email-check.php | cut -d"'" -f3)"
           stable="$(grep -m1 -E '^Stable tag:' readme.txt | awk '{print $NF}')"
-          echo "tag=$tag version=$version header=$header stable=$stable"
-          test "$version" = "$header" && test "$version" = "$stable"
+          echo "tag=$tag header=$header constant=$constant stable=$stable"
+          test "$tag" = "$header" && test "$tag" = "$constant" && test "$tag" = "$stable" || {
+            echo "::error::Run 'npm run set-version -- $tag', commit, and tag that commit."
+            exit 1
+          }
 
       - name: Build the zip
         run: git archive --format=zip --prefix=nanopost-email-check/ -o nanopost-email-check.zip HEAD
 
       - name: Release notes from the readme changelog
         run: |
+          # Release candidates use the changelog section of their final version.
           version="${GITHUB_REF_NAME%%-*}"
           awk -v v="= $version =" '
             $0 == v { on = 1; next }
@@ -63,9 +77,17 @@ jobs:
     needs: release
     if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
+      - name: SVN credentials must be set
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        run: |
+          if [ -z "$SVN_USERNAME" ] || [ -z "$SVN_PASSWORD" ]; then
+            echo "::error::Add the repository secrets SVN_USERNAME and SVN_PASSWORD (only after WordPress.org approval)."
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
 
       - uses: 10up/action-wordpress-plugin-deploy@2.3.0
