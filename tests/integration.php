@@ -868,6 +868,13 @@ foreach ( array( 'https://hooks.slack.com/services/T/B/x', 'https://chat.googlea
 	np_assert( false !== strpos( $np_body['text'], '&lt;!channel&gt; &lt;https://evil.example|Reset password&gt; &lt;users/all&gt; a&amp;b' ), 'webhook text escapes &, < and >: ' . $np_url, $np_body['text'] );
 }
 np_assert( NanoPost_Email_Check_Webhook::payload( $np_fail, 'https://example.com/hook' )['error'] === $np_markup, 'the "error" field keeps the raw text' );
+$np_zw = "\u{200B}";
+np_assert(
+	"@{$np_zw}everyone @{$np_zw}Here (@{$np_zw}channel) @{$np_zw}all, user@everyone.example a@here.example" === NanoPost_Email_Check_Webhook::escape_markup( '@everyone @Here (@channel) @all, user@everyone.example a@here.example' ),
+	'mass mentions get a zero-width space; email addresses do not',
+	NanoPost_Email_Check_Webhook::escape_markup( '@everyone @Here (@channel) @all, user@everyone.example a@here.example' )
+);
+np_assert( '@allowed and @heres' === NanoPost_Email_Check_Webhook::escape_markup( '@allowed and @heres' ), 'longer words that start like a mention are not changed' );
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Help links' );

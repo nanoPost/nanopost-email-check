@@ -98,15 +98,21 @@ class NanoPost_Email_Check_Webhook {
 	}
 
 	/**
-	 * Escape &, < and > as Slack documents, so error text cannot add mentions such as
-	 * <!channel> or disguised links such as <url|label>. Google Chat reads the same
-	 * syntax. The "error" field keeps the raw text.
+	 * Make error text safe for chat receivers. The "error" field keeps the raw text.
+	 *
+	 * - Escape &, < and > as Slack documents, so the text cannot add mentions such as
+	 *   <!channel> or disguised links such as <url|label>. Google Chat reads the same
+	 *   syntax.
+	 * - Put a zero-width space after the "@" of @everyone, @here, @channel and @all, so
+	 *   Discord, Mattermost and Rocket.Chat do not notify everyone. Email addresses are
+	 *   not changed.
 	 *
 	 * @param string $text Text.
 	 * @return string
 	 */
 	public static function escape_markup( $text ) {
-		return str_replace( array( '&', '<', '>' ), array( '&amp;', '&lt;', '&gt;' ), $text );
+		$text = str_replace( array( '&', '<', '>' ), array( '&amp;', '&lt;', '&gt;' ), $text );
+		return (string) preg_replace( '/(?<![\w.+-])@(everyone|here|channel|all)\b/i', "@\u{200B}\$1", $text );
 	}
 
 	/**
