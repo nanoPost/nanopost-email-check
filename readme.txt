@@ -105,6 +105,11 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 
 == Changelog ==
 
+= 1.1.0 =
+* Send test now runs at most once a minute per site.
+* Error text is cut at 4,000 characters in the log, the notices and the webhook.
+* Webhook messages escape the error text, so it cannot add links or mention everyone in Slack, Google Chat, Discord, Mattermost or Rocket.Chat.
+
 = 1.0.0 =
 * First release on WordPress.org. Rebuilt from Daily Email Tester 0.1.
 * Scheduled test email with a choice of interval, and Send test now.
