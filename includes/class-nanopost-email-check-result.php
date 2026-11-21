@@ -16,6 +16,12 @@ class NanoPost_Email_Check_Result {
 	const TRIGGER_MANUAL    = 'manual';
 
 	/**
+	 * Error text is cut at this many characters. It is stored in the log, shown on admin
+	 * screens and sent to the webhook.
+	 */
+	const MAX_ERROR_LENGTH = 4000;
+
+	/**
 	 * Check id, from NanoPost_Email_Check_Check::id().
 	 *
 	 * @var string
@@ -72,9 +78,19 @@ class NanoPost_Email_Check_Result {
 		$this->check     = (string) $check;
 		$this->trigger   = (string) $trigger;
 		$this->passed    = (bool) $passed;
-		$this->error     = (string) $error;
+		$this->error     = self::cut( (string) $error );
 		$this->recipient = (string) $recipient;
 		$this->time      = null === $time ? time() : (int) $time;
+	}
+
+	/**
+	 * Cut text to MAX_ERROR_LENGTH characters.
+	 *
+	 * @param string $text Text.
+	 * @return string
+	 */
+	public static function cut( $text ) {
+		return function_exists( 'mb_substr' ) ? mb_substr( $text, 0, self::MAX_ERROR_LENGTH ) : substr( $text, 0, self::MAX_ERROR_LENGTH );
 	}
 
 	/**

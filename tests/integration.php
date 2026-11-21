@@ -103,6 +103,7 @@ function np_reset() {
 	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
 	delete_option( NanoPost_Email_Check_Scheduler::STATE_OPTION );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
+	delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
 	global $wpdb;
 	delete_metadata( 'user', 0, $wpdb->get_blog_prefix() . NanoPost_Email_Check_Alerts::DISMISSED_META, '', true );
 }
@@ -566,6 +567,21 @@ np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::SEND_ACTION ) );
 $np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_send' ) );
 np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ), 'send: admin with a valid nonce runs and returns to the screen', $np_out );
 np_assert( 1 === $np_log_count(), 'send: one check ran' );
+
+// A second press within one minute sends nothing and asks the user to wait.
+delete_transient( 'nanopost_email_check_sent_' . $np_admin_id );
+$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_send' ) );
+np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ), 'send: a second press returns to the screen', $np_out );
+np_assert( 1 === $np_log_count(), 'send: a second press within one minute runs no check' );
+np_assert( 'wait' === get_transient( 'nanopost_email_check_sent_' . $np_admin_id ), 'send: a second press shows the "wait" notice' );
+ob_start();
+NanoPost_Email_Check_Admin::render();
+$np_html = ob_get_clean();
+np_assert( false !== strpos( $np_html, 'notice-warning' ) && false !== strpos( $np_html, 'Wait one minute' ), 'send: the "wait" notice is shown' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_send' ) );
+np_assert( 2 === $np_log_count(), 'send: after the lock ends, the button sends again' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
 remove_filter( 'pre_wp_mail', '__return_true' );
 
 // Dismiss.
@@ -838,6 +854,22 @@ if ( $np_receiver_up ) {
 }
 
 // ---------------------------------------------------------------------------------------
+np_section( 'Security: hostile error text' );
+$np_long = new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, str_repeat( 'é', 5000 ) );
+np_assert( 4000 === mb_strlen( $np_long->error ) && mb_check_encoding( $np_long->error, 'UTF-8' ), 'error text is cut at 4,000 characters, on a character boundary', mb_strlen( $np_long->error ) );
+$np_long = NanoPost_Email_Check_Result::from_array( array( 'error' => str_repeat( 'a', 5000 ) ) );
+np_assert( 4000 === strlen( $np_long->error ), 'a long stored error is cut when read' );
+
+$np_markup = '<!channel> <https://evil.example|Reset password> <users/all> a&b';
+$np_fail   = new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, $np_markup );
+foreach ( array( 'https://hooks.slack.com/services/T/B/x', 'https://chat.googleapis.com/v1/spaces/x/messages?key=k' ) as $np_url ) {
+	$np_body = NanoPost_Email_Check_Webhook::payload( $np_fail, $np_url );
+	np_assert( false === strpos( $np_body['text'], '<' ) && false === strpos( $np_body['text'], '>' ), 'webhook text has no < or > from the error: ' . $np_url, $np_body['text'] );
+	np_assert( false !== strpos( $np_body['text'], '&lt;!channel&gt; &lt;https://evil.example|Reset password&gt; &lt;users/all&gt; a&amp;b' ), 'webhook text escapes &, < and >: ' . $np_url, $np_body['text'] );
+}
+np_assert( NanoPost_Email_Check_Webhook::payload( $np_fail, 'https://example.com/hook' )['error'] === $np_markup, 'the "error" field keeps the raw text' );
+
+// ---------------------------------------------------------------------------------------
 np_section( 'Help links' );
 np_assert( 'https://nanopo.st/email-check-plugin/error/#error=SMTP%20Error%3A%20x%26y' === NanoPost_Email_Check_Help::error( 'SMTP Error: x&y' ), 'error text is rawurlencoded after #' );
 np_assert( strlen( rawurldecode( substr( NanoPost_Email_Check_Help::error( str_repeat( 'a', 5000 ) ), strlen( 'https://nanopo.st/email-check-plugin/error/#error=' ) ) ) ) === 4000, 'error text is cut at 4,000 characters' );
@@ -848,6 +880,7 @@ update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'x@e
 NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'manual', true ) );
 update_option( NanoPost_Email_Check_Webhook::STATE_OPTION, array( 'last_status' => array() ) );
 np_schedule_state( time(), time() );
+set_transient( NanoPost_Email_Check_Admin::SEND_LOCK, 1, MINUTE_IN_SECONDS );
 update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
 $np_second = 0;
@@ -873,6 +906,7 @@ require NANOPOST_EMAIL_CHECK_DIR . 'uninstall.php';
 wp_cache_flush();
 $np_left = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->options WHERE option_name LIKE 'nanopost\\_email\\_check%'" );
 np_assert( 0 === $np_left, 'no options left', $np_left );
+np_assert( false === get_transient( NanoPost_Email_Check_Admin::SEND_LOCK ), 'no send lock left' );
 np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'no dismissed-notice user option left' );
 np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'no scheduled event left' );
 if ( $np_second ) {

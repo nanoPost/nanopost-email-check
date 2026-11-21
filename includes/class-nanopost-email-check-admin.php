@@ -15,6 +15,7 @@ class NanoPost_Email_Check_Admin {
 	const PAGE        = 'nanopost-email-check';
 	const SEND_ACTION = 'nanopost_email_check_send';
 	const CAPABILITY  = 'manage_options';
+	const SEND_LOCK   = 'nanopost_email_check_send_lock';
 
 	/**
 	 * Register hooks.
@@ -162,13 +163,21 @@ class NanoPost_Email_Check_Admin {
 
 	/**
 	 * Handle "Send test now". Runs the checks, stores the outcome for one notice, returns
-	 * to the screen.
+	 * to the screen. At most one manual test per site each minute, so the button cannot
+	 * send a stream of mail.
 	 */
 	public static function handle_send() {
 		if ( ! current_user_can( self::CAPABILITY ) ) {
 			wp_die( esc_html__( 'You are not allowed to run email checks.', 'nanopost-email-check' ), 403 );
 		}
 		check_admin_referer( self::SEND_ACTION );
+
+		if ( false !== get_transient( self::SEND_LOCK ) ) {
+			set_transient( self::notice_key(), 'wait', MINUTE_IN_SECONDS );
+			wp_safe_redirect( self::page_url() );
+			exit;
+		}
+		set_transient( self::SEND_LOCK, 1, MINUTE_IN_SECONDS );
 
 		$results = NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_MANUAL );
 		$passed  = ! empty( $results );
@@ -240,7 +249,10 @@ class NanoPost_Email_Check_Admin {
 		}
 		delete_transient( self::notice_key() );
 
-		if ( 'passed' === $outcome ) {
+		if ( 'wait' === $outcome ) {
+			$class   = 'notice-warning';
+			$message = __( 'A test email was sent less than one minute ago. Wait one minute, then try again.', 'nanopost-email-check' );
+		} elseif ( 'passed' === $outcome ) {
 			$class   = 'notice-success';
 			$message = sprintf(
 				/* translators: %s: recipient email address. */

@@ -81,7 +81,7 @@ class NanoPost_Email_Check_Webhook {
 			$text = sprintf( __( 'Email check passed again on %s.', 'nanopost-email-check' ), $site );
 		} else {
 			/* translators: 1: site address, 2: error text. */
-			$text = sprintf( __( 'Email check failed on %1$s: %2$s', 'nanopost-email-check' ), $site, $result->error_message() );
+			$text = sprintf( __( 'Email check failed on %1$s: %2$s', 'nanopost-email-check' ), $site, self::escape_markup( $result->error_message() ) );
 		}
 
 		if ( self::is_google_chat( $url ) ) {
@@ -95,6 +95,18 @@ class NanoPost_Email_Check_Webhook {
 			'error'  => $result->passed ? '' : $result->error_message(),
 			'time'   => gmdate( 'c', $result->time ),
 		);
+	}
+
+	/**
+	 * Escape &, < and > as Slack documents, so error text cannot add mentions such as
+	 * <!channel> or disguised links such as <url|label>. Google Chat reads the same
+	 * syntax. The "error" field keeps the raw text.
+	 *
+	 * @param string $text Text.
+	 * @return string
+	 */
+	public static function escape_markup( $text ) {
+		return str_replace( array( '&', '<', '>' ), array( '&amp;', '&lt;', '&gt;' ), $text );
 	}
 
 	/**
