@@ -23,3 +23,7 @@ npm run zip               # release zip from tracked files (git archive)
 ```
 
 Bug reports and pull requests are welcome.
+
+## Security
+
+To report a security problem, see [SECURITY.md](SECURITY.md). Do not open a public issue.
