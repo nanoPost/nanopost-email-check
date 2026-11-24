@@ -4,7 +4,7 @@ Tags: email, test email, wp_mail, email monitoring, smtp
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -110,7 +110,7 @@ Yes, with WP-CLI. The `wp email-check` command has these subcommands:
 
 * `wp email-check settings get` and `wp email-check settings set <key> <value>`: show or change a setting. The keys are `recipient`, `interval` (`twicedaily`, `daily` or `weekly`) and `webhook_url`. A value is checked with the same rules as the plugin screen. An invalid value changes nothing and exits with 1.
 * `wp email-check run`: send a test email now. The log shows "WP-CLI" as what started it. Exits with 0 when the check passed and 1 when it failed.
-* `wp email-check status`: show whether the checks run and pass. Add `--format=json` for scripts. Exits with 0 when all is well, 1 when the last check failed, and 2 when scheduled checks have stopped or are not scheduled.
+* `wp email-check status`: show whether the checks run and pass. Add `--format=json` for scripts. Exits with 0 when all is well, 1 when the last check failed, 2 when scheduled checks have stopped or are not scheduled, and 3 when no check has run yet.
 * `wp email-check test-alert`: send a test alert to the saved webhook URL. Exits with 0 when the receiver accepted it, and 1 otherwise.
 
 `run` and `test-alert` have no once-a-minute limit. On multisite, choose the site with `--url`. For details, run `wp help email-check`.
@@ -131,7 +131,7 @@ A value set in code wins over the plugin screen, and the screen shows it read-on
 
 = What happens to the data when I delete the plugin? =
 
-Deleting the plugin removes its settings, the log, the webhook state, the dismissed-notice records and the scheduled event.
+Deleting the plugin removes its settings, the log, the webhook state, the dismissed-notice records and the scheduled event. With WP-CLI, use `wp plugin uninstall nanopost-email-check --deactivate`: `wp plugin delete` removes only the files and leaves the data in the database.
 
 == External services ==
 
@@ -166,6 +166,11 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.3.1 =
+* WP-CLI: `wp email-check status` reports `not-checked` and exits with 3 when no check has run yet, so a script can tell it from a passing check.
+* WP-CLI: help links printed by the command are tagged as coming from WP-CLI.
+* Readme: with WP-CLI, `wp plugin uninstall` removes the plugin's data; `wp plugin delete` removes only the files.
 
 = 1.3.0 =
 * WP-CLI: `wp email-check` with `settings get` and `settings set`, `run`, `status` and `test-alert`, with exit codes for scripts. A check started this way shows "WP-CLI" in the log.

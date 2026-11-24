@@ -205,7 +205,7 @@ remove_filter( 'pre_wp_mail', $np_mail_fail, 10 );
 np_assert( 1 === $np_out->return_code, 'run: exit 1 on fail', $np_out );
 np_assert( false !== strpos( $np_out->stderr, 'Error: The test email to cli@example.com failed.' ), 'run: says the email failed', $np_out->stderr );
 np_assert( false !== strpos( $np_out->stdout, 'Error text: SMTP Error: Could not authenticate.' ), 'run: prints the error text', $np_out->stdout );
-np_assert( false !== strpos( $np_out->stdout, 'What this error means: https://nanopo.st/email-check-plugin/error/?utm_source=wp-admin&utm_medium=email-check&utm_content=cli#error=' ), 'run: prints the help link', $np_out->stdout );
+np_assert( false !== strpos( $np_out->stdout, 'What this error means: https://nanopo.st/email-check-plugin/error/?utm_source=wp-cli&utm_medium=email-check&utm_content=cli#error=' ), 'run: prints the help link', $np_out->stdout );
 np_assert( count( $GLOBALS['np_requests'] ) === $np_n + 1, 'run: a failure sends the webhook alert as usual' );
 $np_body = json_decode( end( $GLOBALS['np_requests'] )['args']['body'], true );
 np_assert( 'fail' === $np_body['status'] && 'SMTP Error: Could not authenticate.' === $np_body['error'], 'run: the alert holds the error', $np_body );
@@ -238,7 +238,10 @@ np_assert( null === $np_data['next_run'] && null === $np_data['last_check'], 'st
 
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
 list( $np_code, $np_data ) = np_cli_status();
-np_assert( 0 === $np_code && 'ok' === $np_data['state'], 'status: scheduled, nothing failed: ok, exit 0', array( $np_code, $np_data ) );
+np_assert( 3 === $np_code && 'not-checked' === $np_data['state'], 'status: scheduled, no check has run yet: not-checked, exit 3', array( $np_code, $np_data ) );
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'manual', true, '', 'owner@example.com' ) );
+list( $np_code, $np_data ) = np_cli_status();
+np_assert( 0 === $np_code && 'ok' === $np_data['state'], 'status: scheduled, last check passed: ok, exit 0', array( $np_code, $np_data ) );
 np_assert( 'daily' === $np_data['interval'] && (bool) preg_match( '/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00$/', (string) $np_data['next_run'] ), 'status: interval and next run (ISO 8601 UTC)', $np_data );
 np_assert( array( 'state', 'last_check', 'failed_check', 'mailer', 'interval', 'settings', 'code_errors', 'next_run', 'stopped_since', 'webhook' ) === array_keys( $np_data ), 'status: JSON fields', array_keys( $np_data ) );
 np_assert(
@@ -279,7 +282,7 @@ list( $np_code, $np_data ) = np_cli_status();
 np_assert( 2 === $np_code && 'stopped' === $np_data['state'], 'status: stale: stopped, exit 2', array( $np_code, $np_data ) );
 np_assert( gmdate( 'c', $np_t ) === $np_data['stopped_since'], 'status: stopped since the last finished check', $np_data['stopped_since'] );
 $np_out = np_cli( 'status' );
-np_assert( 2 === $np_out->return_code && false !== strpos( $np_out->stdout, 'Stopped.' ) && false !== strpos( $np_out->stdout, 'cron/?utm_source=wp-admin&utm_medium=email-check&utm_content=cli' ), 'status: the table says stopped and links to the cron help', $np_out->stdout );
+np_assert( 2 === $np_out->return_code && false !== strpos( $np_out->stdout, 'Stopped.' ) && false !== strpos( $np_out->stdout, 'cron/?utm_source=wp-cli&utm_medium=email-check&utm_content=cli' ), 'status: the table says stopped and links to the cron help', $np_out->stdout );
 
 // The page-load WP-Cron guard is not used under WP-CLI: wp_loaded records no lock there.
 np_assert( false === has_action( 'wp_loaded', array( 'NanoPost_Email_Check_Alerts', 'remember_cron_lock' ) ), 'status: the WP-Cron guard is not hooked under WP-CLI' );
@@ -308,7 +311,7 @@ np_assert( true === $np_data['webhook']['url_set'] && null === $np_data['webhook
 NanoPost_Email_Check_Webhook::send_test();
 list( $np_code, $np_data ) = np_cli_status();
 $np_d                      = $np_data['webhook']['last_delivery'];
-np_assert( 0 === $np_code && $np_d && true === $np_d['ok'] && true === $np_d['test'] && '204 No Content' === $np_d['detail'], 'status: webhook last delivery, marked as a test', $np_d );
+np_assert( 3 === $np_code && $np_d && true === $np_d['ok'] && true === $np_d['test'] && '204 No Content' === $np_d['detail'], 'status: webhook last delivery, marked as a test', $np_d );
 np_assert( false === strpos( wp_json_encode( $np_data ), 'hooks.slack.com' ), 'status: the webhook URL is not printed' );
 $np_out = np_cli( 'status' );
 np_assert( false !== strpos( $np_out->stdout, 'Last webhook message (test alert):' ), 'status: the table names the test alert', $np_out->stdout );

@@ -119,7 +119,7 @@ class NanoPost_Email_Check_Help {
 	 */
 	private static function url( $path, $place, $fragment = '' ) {
 		$tags = array(
-			'utm_source' => 'wp-admin',
+			'utm_source' => self::PLACE_CLI === $place ? 'wp-cli' : 'wp-admin',
 			'utm_medium' => 'email-check',
 		);
 		if ( '' !== $place ) {

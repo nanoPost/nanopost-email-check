@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * ## EXIT CODES
  *
  * run: 0 when the check passed, 1 when it failed.
- * status: 0 ok, 1 failing, 2 stopped or not scheduled.
+ * status: 0 ok, 1 failing, 2 stopped or not scheduled, 3 no check has run yet.
  * test-alert: 0 when the receiver accepted the message, 1 otherwise.
  * settings set: 1 on an invalid value, which changes nothing.
  *
@@ -36,6 +36,7 @@ class NanoPost_Email_Check_CLI {
 	const STATE_FAILING       = 'failing';
 	const STATE_STOPPED       = 'stopped';
 	const STATE_NOT_SCHEDULED = 'not-scheduled';
+	const STATE_NOT_CHECKED   = 'not-checked';
 
 	/**
 	 * Register the commands. Called only when WP-CLI is running.
@@ -210,6 +211,8 @@ class NanoPost_Email_Check_CLI {
 			$state = self::STATE_STOPPED;
 		} elseif ( null !== $failed ) {
 			$state = self::STATE_FAILING;
+		} elseif ( null === $latest ) {
+			$state = self::STATE_NOT_CHECKED;
 		} else {
 			$state = self::STATE_OK;
 		}
@@ -270,6 +273,9 @@ class NanoPost_Email_Check_CLI {
 	public static function status_exit_code( $state ) {
 		if ( self::STATE_OK === $state ) {
 			return 0;
+		}
+		if ( self::STATE_NOT_CHECKED === $state ) {
+			return 3;
 		}
 		return self::STATE_FAILING === $state ? 1 : 2;
 	}
