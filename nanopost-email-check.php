@@ -3,7 +3,7 @@
  * Plugin Name:       nanoPost Email Check
  * Plugin URI:        https://nanopo.st/email-check-plugin/
  * Description:       Check that your site can still send email. Sends a scheduled test email, logs each result and warns you when a check fails.
- * Version:           1.2.0
+ * Version:           1.2.1
  * Requires at least: 6.4
  * Requires PHP:      7.4
  * Author:            nanoPost
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'NANOPOST_EMAIL_CHECK_VERSION', '1.2.0' );
+define( 'NANOPOST_EMAIL_CHECK_VERSION', '1.2.1' );
 define( 'NANOPOST_EMAIL_CHECK_FILE', __FILE__ );
 define( 'NANOPOST_EMAIL_CHECK_DIR', plugin_dir_path( __FILE__ ) );
 

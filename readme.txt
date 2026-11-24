@@ -4,7 +4,7 @@ Tags: email, test email, wp_mail, email monitoring, smtp
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -134,6 +134,10 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.2.1 =
+* Multisite: network activation now schedules the checks on every site, and on each new site. Sites left without a schedule by an earlier network activation are scheduled on their next request.
+* WP-CLI: a setting that is refused, for example an invalid recipient address, now prints a warning.
 
 = 1.2.0 =
 * Send test alert: a button under the webhook URL posts a test message to the saved URL, at most once a minute per site. The message says that it is a test, and its JSON has `"test": true`. The webhook status shows when the last message was a test.
