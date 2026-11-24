@@ -38,6 +38,21 @@ for _ in $(seq 1 20); do
   sleep 0.5
 done
 
+# PHP mail(): give the CLI container a sendmail program that hands each message to Mailpit
+# (Mailpit's own binary in its "sendmail" mode), so the tests run mail() for real and read
+# the result from Mailpit. Nothing leaves the Docker network. The setting lives in the
+# container and is written again on every run, because wp-env can recreate it.
+cli="$(docker ps --format '{{.Names}}' | grep -E '^wp-env-nanopost-email-check-[0-9a-f]+-cli-1$' | head -1 || true)"
+if [ -n "$cli" ]; then
+  tmp="$(mktemp -d)"
+  docker cp "$MAILPIT_NAME:/mailpit" "$tmp/mailpit" >/dev/null
+  docker cp "$tmp/mailpit" "$cli:/usr/local/bin/mailpit" >/dev/null
+  rm -rf "$tmp"
+  docker exec -u root "$cli" sh -c 'printf "sendmail_path = \"/usr/local/bin/mailpit sendmail -S mailpit:1025 -t -i\"\n" > /usr/local/etc/php/conf.d/zz-nanopost-email-check-sendmail.ini'
+else
+  echo "No wp-env CLI container found: the PHP mail() tests will be skipped." >&2
+fi
+
 # On multisite, the tests need a second site. Creating one adds tables (DDL), which would
 # end the tests' database transaction, so it is created here, before the run.
 if npx wp-env run cli wp eval 'echo is_multisite() ? "yes" : "no";' 2>/dev/null | grep -qx yes; then

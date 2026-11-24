@@ -310,6 +310,26 @@ if ( $np_mailpit_up ) {
 }
 
 // ---------------------------------------------------------------------------------------
+np_section( 'Real send through PHP mail()' );
+// tests/run.sh points sendmail_path at Mailpit's sendmail mode, so mail() really runs.
+if ( $np_mailpit_up && false !== strpos( (string) ini_get( 'sendmail_path' ), 'mailpit' ) ) {
+	np_mailpit( 'DELETE', 'messages' );
+	remove_all_actions( 'phpmailer_init' );
+
+	$np_results = NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_MANUAL );
+	np_assert( 1 === count( $np_results ) && $np_results[0]->passed, 'mail(): check passes', $np_results );
+	np_assert( 'mail' === $np_results[0]->mailer['type'], 'mail(): recorded as PHP mail()', $np_results[0]->mailer );
+
+	$np_list = np_mailpit( 'GET', 'messages' );
+	$np_msg  = isset( $np_list['messages'][0] ) ? $np_list['messages'][0] : array();
+	np_assert( 1 === (int) ( $np_list['total'] ?? 0 ), 'mail(): one email arrived in Mailpit', $np_list['total'] ?? null );
+	np_assert( isset( $np_msg['To'][0]['Address'] ) && 'check@example.com' === $np_msg['To'][0]['Address'], 'mail(): sent to the recipient', $np_msg['To'] ?? null );
+	np_assert( isset( $np_msg['Subject'] ) && false !== strpos( $np_msg['Subject'], 'Email check: manual test' ), 'mail(): subject names a manual test', $np_msg['Subject'] ?? null );
+} else {
+	WP_CLI::log( '  skip  no sendmail program for Mailpit (run the tests with npm test)' );
+}
+
+// ---------------------------------------------------------------------------------------
 np_section( 'Failure with no error text' );
 np_reset();
 add_filter( 'pre_wp_mail', '__return_false' );
