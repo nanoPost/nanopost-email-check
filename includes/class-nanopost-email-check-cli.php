@@ -229,7 +229,10 @@ class NanoPost_Email_Check_CLI {
 				'error' => $failed->error_message(),
 				'help'  => NanoPost_Email_Check_Help::for_failure( $failed, NanoPost_Email_Check_Help::PLACE_CLI ),
 			),
+			'mailer'        => null === $latest ? null : $latest->mailer,
 			'interval'      => NanoPost_Email_Check_Settings::interval(),
+			'settings'      => self::settings_sources(),
+			'code_errors'   => wp_list_pluck( NanoPost_Email_Check_Settings::errors(), 'message' ),
 			'next_run'      => $next ? self::iso_time( (int) $next ) : null,
 			'stopped_since' => null === $stale ? null : self::iso_time( $stale ),
 			'webhook'       => array(
@@ -242,6 +245,20 @@ class NanoPost_Email_Check_CLI {
 				),
 			),
 		);
+	}
+
+	/**
+	 * Where each setting comes from: option, constant or filter. Values are left out: the
+	 * webhook URL can hold a secret.
+	 *
+	 * @return array Setting key => source.
+	 */
+	private static function settings_sources() {
+		$sources = array();
+		foreach ( array_keys( NanoPost_Email_Check_Settings::defaults() ) as $key ) {
+			$sources[ $key ] = NanoPost_Email_Check_Settings::source( $key );
+		}
+		return $sources;
 	}
 
 	/**
@@ -290,6 +307,10 @@ class NanoPost_Email_Check_CLI {
 				)
 			);
 			$add( __( 'Sent to', 'nanopost-email-check' ), $last['recipient'] );
+			$mailer = null === $data['mailer'] ? '' : NanoPost_Email_Check_Mailer::describe( $data['mailer'] );
+			if ( '' !== $mailer ) {
+				$add( __( 'Mailer', 'nanopost-email-check' ), $mailer );
+			}
 		}
 
 		if ( null !== $data['failed_check'] ) {
@@ -298,7 +319,7 @@ class NanoPost_Email_Check_CLI {
 		}
 
 		if ( self::STATE_NOT_SCHEDULED === $data['state'] ) {
-			$add( __( 'Scheduled checks', 'nanopost-email-check' ), __( 'Not scheduled. Load any wp-admin page to schedule the checks again.', 'nanopost-email-check' ) );
+			$add( __( 'Scheduled checks', 'nanopost-email-check' ), __( 'Not scheduled. The next request to the site schedules the checks again.', 'nanopost-email-check' ) );
 		} elseif ( null !== $data['stopped_since'] ) {
 			$add(
 				__( 'Scheduled checks', 'nanopost-email-check' ),
@@ -322,6 +343,14 @@ class NanoPost_Email_Check_CLI {
 					NanoPost_Email_Check_Admin::format_time( self::unix_time( $data['next_run'] ) )
 				)
 			);
+		}
+
+		$in_code = array_keys( array_diff( $data['settings'], array( NanoPost_Email_Check_Settings::SOURCE_OPTION ) ) );
+		if ( $in_code ) {
+			$add( __( 'Set in code', 'nanopost-email-check' ), implode( ', ', $in_code ) );
+		}
+		foreach ( $data['code_errors'] as $message ) {
+			$add( __( 'Ignored', 'nanopost-email-check' ), $message );
 		}
 
 		$delivery = $data['webhook']['last_delivery'];

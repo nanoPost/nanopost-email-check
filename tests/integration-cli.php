@@ -240,7 +240,7 @@ NanoPost_Email_Check_Scheduler::ensure_scheduled();
 list( $np_code, $np_data ) = np_cli_status();
 np_assert( 0 === $np_code && 'ok' === $np_data['state'], 'status: scheduled, nothing failed: ok, exit 0', array( $np_code, $np_data ) );
 np_assert( 'daily' === $np_data['interval'] && (bool) preg_match( '/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00$/', (string) $np_data['next_run'] ), 'status: interval and next run (ISO 8601 UTC)', $np_data );
-np_assert( array( 'state', 'last_check', 'failed_check', 'interval', 'next_run', 'stopped_since', 'webhook' ) === array_keys( $np_data ), 'status: JSON fields', array_keys( $np_data ) );
+np_assert( array( 'state', 'last_check', 'failed_check', 'mailer', 'interval', 'settings', 'code_errors', 'next_run', 'stopped_since', 'webhook' ) === array_keys( $np_data ), 'status: JSON fields', array_keys( $np_data ) );
 np_assert(
 	array(
 		'url_set'       => false,

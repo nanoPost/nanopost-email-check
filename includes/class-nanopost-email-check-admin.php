@@ -122,14 +122,14 @@ class NanoPost_Email_Check_Admin {
 		echo '</p>';
 
 		// The button belongs to a separate form after the settings form (forms cannot be
-		// nested). It sends to the saved URL only.
+		// nested). It sends to the webhook URL in use (saved, or set in code).
 		echo '<p>';
 		if ( '' !== $settings['webhook_url'] ) {
 			printf( '<button type="submit" class="button" form="%1$s">%2$s</button> ', esc_attr( self::TEST_ALERT_FORM ), esc_html__( 'Send test alert', 'nanopost-email-check' ) );
-			echo '<span class="description">' . esc_html__( 'Sends a test message to the saved URL.', 'nanopost-email-check' ) . '</span>';
+			echo '<span class="description">' . esc_html__( 'Sends a test message to this URL.', 'nanopost-email-check' ) . '</span>';
 		} else {
 			echo '<button type="button" class="button" disabled="disabled">' . esc_html__( 'Send test alert', 'nanopost-email-check' ) . '</button> ';
-			echo '<span class="description">' . esc_html__( 'Save a webhook URL to send a test alert.', 'nanopost-email-check' ) . '</span>';
+			echo '<span class="description">' . esc_html__( 'Enter and save a webhook URL to send a test alert.', 'nanopost-email-check' ) . '</span>';
 		}
 		echo '</p>';
 

@@ -284,6 +284,26 @@ remove_filter( 'nanopost_email_check_constant', $np_spy, 20 );
 np_assert( array( 'NANOPOST_EMAIL_CHECK_INTERVAL' ) === $np_names, 'interval(): reads only the interval constant', $np_names );
 np_assert( 'weekly' === NanoPost_Email_Check_Settings::interval(), 'interval(): the constant wins' );
 
+// status shows where each setting comes from, values from code that were ignored, and the
+// mailer of the last check. It never prints the webhook URL.
+$GLOBALS['np_constants']['NANOPOST_EMAIL_CHECK_WEBHOOK_URL'] = 'not a url';
+np_cli( 'run' );
+list( , $np_status ) = np_cli_status();
+np_assert(
+	array(
+		'recipient'   => 'constant',
+		'interval'    => 'constant',
+		'webhook_url' => 'option',
+	) === $np_status['settings'],
+	'status: the source of each setting',
+	$np_status['settings']
+);
+np_assert( 1 === count( $np_status['code_errors'] ) && false !== strpos( $np_status['code_errors'][0], 'NANOPOST_EMAIL_CHECK_WEBHOOK_URL' ), 'status: an ignored value from code is listed', $np_status['code_errors'] );
+np_assert( is_array( $np_status['mailer'] ) && array_key_exists( 'type', $np_status['mailer'] ), 'status: the mailer of the last check', $np_status['mailer'] );
+$np_out = np_cli( 'status' );
+np_assert( false !== strpos( $np_out->stdout, "Set in code\trecipient, interval" ), 'status table: the settings set in code', $np_out->stdout );
+np_assert( false !== strpos( $np_out->stdout, "Ignored\tNANOPOST_EMAIL_CHECK_WEBHOOK_URL" ), 'status table: the ignored value from code', $np_out->stdout );
+
 $GLOBALS['np_constants'] = array();
 
 remove_filter( 'nanopost_email_check_constant', $np_constant_seam, 10 );
