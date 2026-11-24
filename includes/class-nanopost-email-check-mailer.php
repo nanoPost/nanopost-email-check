@@ -27,6 +27,7 @@ class NanoPost_Email_Check_Mailer {
 	 */
 	const VIA_PRE_WP_MAIL = 'pre_wp_mail';
 	const VIA_WP_MAIL     = 'wp_mail';
+	const VIA_PHPMAILER   = 'phpmailer';
 
 	/**
 	 * Stored text fields are cut at this many characters.
@@ -60,6 +61,14 @@ class NanoPost_Email_Check_Mailer {
 	 * @var array
 	 */
 	private $seen = array();
+
+	/**
+	 * File of a PHPMailer subclass that overrides sending, or ''. Some plugins swap in such
+	 * a class and send by their own API while Mailer still reads "mail".
+	 *
+	 * @var string
+	 */
+	private $override_file = '';
 
 	/**
 	 * PHPMailer's Sendmail path. Used for the sendmail check only; not stored.
@@ -111,6 +120,34 @@ class NanoPost_Email_Check_Mailer {
 		);
 		$this->sendmail = isset( $phpmailer->Sendmail ) ? (string) $phpmailer->Sendmail : '';
 		// phpcs:enable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		$this->override_file = self::sending_override_file( $phpmailer );
+	}
+
+	/**
+	 * File of the class that overrides PHPMailer's sending, when the object is a subclass
+	 * that does. Then the Mailer value does not say how the mail is sent.
+	 *
+	 * @param object $phpmailer PHPMailer instance.
+	 * @return string Empty for PHPMailer itself or a subclass that sends as PHPMailer does.
+	 */
+	private static function sending_override_file( $phpmailer ) {
+		$base = 'PHPMailer\\PHPMailer\\PHPMailer';
+		if ( ! is_object( $phpmailer ) || get_class( $phpmailer ) === $base || ! is_a( $phpmailer, $base ) ) {
+			return '';
+		}
+		foreach ( array( 'send', 'preSend', 'postSend', 'mailSend', 'sendmailSend', 'smtpSend' ) as $method ) {
+			try {
+				$declared = new ReflectionMethod( $phpmailer, $method );
+			} catch ( ReflectionException $e ) {
+				continue;
+			}
+			$class = $declared->getDeclaringClass();
+			if ( $base !== $class->getName() ) {
+				$file = $class->getFileName();
+				return is_string( $file ) ? wp_normalize_path( $file ) : '';
+			}
+		}
+		return '';
 	}
 
 	/**
@@ -125,6 +162,16 @@ class NanoPost_Email_Check_Mailer {
 					'type' => self::TYPE_PLUGIN,
 					'via'  => self::VIA_PRE_WP_MAIL,
 					'name' => self::pre_wp_mail_plugin( array( $this, 'on_pre_wp_mail' ) ),
+				)
+			);
+		}
+
+		if ( $this->init_fired && '' !== $this->override_file ) {
+			return self::normalize(
+				array(
+					'type' => self::TYPE_PLUGIN,
+					'via'  => self::VIA_PHPMAILER,
+					'name' => self::plugin_name( $this->override_file ),
 				)
 			);
 		}
@@ -235,7 +282,7 @@ class NanoPost_Email_Check_Mailer {
 	 *
 	 * Keys: type ('smtp', 'mail', 'sendmail', 'qmail', 'other', 'plugin' or '' when not
 	 * known), host and port (smtp), name (the Mailer value for 'other', the plugin name
-	 * for 'plugin', or ''), via ('pre_wp_mail' or 'wp_mail', for 'plugin').
+	 * for 'plugin', or ''), via ('pre_wp_mail', 'wp_mail' or 'phpmailer', for 'plugin').
 	 *
 	 * @param mixed $data Mailer info.
 	 * @return array
@@ -262,7 +309,7 @@ class NanoPost_Email_Check_Mailer {
 		}
 		if ( self::TYPE_PLUGIN === $type ) {
 			$via         = isset( $data['via'] ) ? $data['via'] : '';
-			$info['via'] = in_array( $via, array( self::VIA_PRE_WP_MAIL, self::VIA_WP_MAIL ), true ) ? $via : self::VIA_PRE_WP_MAIL;
+			$info['via'] = in_array( $via, array( self::VIA_PRE_WP_MAIL, self::VIA_WP_MAIL, self::VIA_PHPMAILER ), true ) ? $via : self::VIA_PRE_WP_MAIL;
 		}
 
 		return $info;
@@ -294,6 +341,12 @@ class NanoPost_Email_Check_Mailer {
 				/* translators: %s: PHPMailer mailer name set by another plugin, such as "sendgrid". */
 				return sprintf( __( 'Sends through the "%s" mailer', 'nanopost-email-check' ), $info['name'] );
 			case self::TYPE_PLUGIN:
+				if ( self::VIA_PHPMAILER === $info['via'] ) {
+					return '' === $info['name']
+						? __( 'Sending is handled by another plugin, through its own PHPMailer class', 'nanopost-email-check' )
+						/* translators: %s: plugin name. */
+						: sprintf( __( 'Sending is handled by %s, through its own PHPMailer class', 'nanopost-email-check' ), $info['name'] );
+				}
 				if ( self::VIA_WP_MAIL === $info['via'] ) {
 					return '' === $info['name']
 						? __( 'Sending is handled by another plugin, which replaces wp_mail()', 'nanopost-email-check' )

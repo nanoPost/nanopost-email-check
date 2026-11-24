@@ -172,6 +172,29 @@ if ( null !== $np_saved_pre ) {
 	$wp_filter['pre_wp_mail'] = $np_saved_pre; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores the hooks saved above.
 }
 
+// A plugin that swaps in its own PHPMailer subclass and sends by API, while Mailer reads
+// "mail" (as SMTP2GO does): recorded as handled by that plugin, with no sendmail cause.
+require_once ABSPATH . WPINC . '/PHPMailer/PHPMailer.php';
+require_once __DIR__ . '/class-nanopost-email-check-test-api-mailer.php';
+global $phpmailer;
+$np_saved_mailer = $phpmailer;
+$np_swap         = static function ( $atts ) {
+	$GLOBALS['phpmailer'] = new NanoPost_Email_Check_Test_Api_Mailer( true ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- What the plugin under test does.
+	return $atts;
+};
+$np_is_mail      = static function ( $mailer ) {
+	$mailer->isMail();
+};
+add_filter( 'wp_mail', $np_swap );
+add_action( 'phpmailer_init', $np_is_mail, 1000 );
+$np = np_diag_run();
+remove_filter( 'wp_mail', $np_swap );
+remove_action( 'phpmailer_init', $np_is_mail, 1000 );
+$phpmailer = $np_saved_mailer; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores the instance saved above.
+np_assert( $np->passed && 'plugin' === $np->mailer['type'] && 'phpmailer' === $np->mailer['via'], 'PHPMailer subclass: recorded as handled by a plugin, not as mail()', $np->mailer );
+np_assert( 'nanoPost Email Check' === $np->mailer['name'], 'PHPMailer subclass: named by the plugin of its class file', $np->mailer );
+np_assert( 'Sending is handled by nanoPost Email Check, through its own PHPMailer class' === NanoPost_Email_Check_Mailer::describe( $np->mailer ), 'PHPMailer subclass: status text', NanoPost_Email_Check_Mailer::describe( $np->mailer ) );
+
 // A wp_mail() that never runs pre_wp_mail is not core's. Core's own file names no plugin.
 $np_info = ( new NanoPost_Email_Check_Mailer() )->info();
 np_assert( 'plugin' === $np_info['type'] && 'wp_mail' === $np_info['via'] && '' === $np_info['name'], 'replaced wp_mail(): recorded, and WordPress itself is not named', $np_info );
