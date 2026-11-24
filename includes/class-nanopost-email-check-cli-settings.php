@@ -72,11 +72,12 @@ class NanoPost_Email_Check_CLI_Settings {
 		$rows = array();
 		foreach ( $settings as $key => $value ) {
 			$rows[] = array(
-				'key'   => $key,
-				'value' => $value,
+				'key'    => $key,
+				'value'  => $value,
+				'source' => NanoPost_Email_Check_Settings::source( $key ),
 			);
 		}
-		WP_CLI\Utils\format_items( $format, $rows, array( 'key', 'value' ) );
+		WP_CLI\Utils\format_items( $format, $rows, array( 'key', 'value', 'source' ) );
 	}
 
 	/**
@@ -111,12 +112,21 @@ class NanoPost_Email_Check_CLI_Settings {
 	public function set( $args ) {
 		list( $key, $value ) = $args;
 
+		if ( array_key_exists( $key, NanoPost_Email_Check_Settings::defaults() ) && NanoPost_Email_Check_Settings::locked( $key ) ) {
+			$where = NanoPost_Email_Check_Settings::SOURCE_CONSTANT === NanoPost_Email_Check_Settings::source( $key )
+				? NanoPost_Email_Check_Settings::constant_name( $key )
+				: NanoPost_Email_Check_Settings::FILTER . ' filter';
+			/* translators: 1: setting name, 2: constant name or filter name. */
+			WP_CLI::error( sprintf( __( 'The setting %1$s is set in code (%2$s) and cannot be changed here.', 'nanopost-email-check' ), $key, $where ) );
+		}
+
 		$clean = NanoPost_Email_Check_Settings::validate( $key, $value );
 		if ( is_wp_error( $clean ) ) {
 			WP_CLI::error( $clean );
 		}
 
-		$settings         = NanoPost_Email_Check_Settings::get();
+		// The stored values only: values set in code must not be copied into the option.
+		$settings         = NanoPost_Email_Check_Settings::stored();
 		$settings[ $key ] = $clean;
 		// Through the option, so the sanitize callback and the reschedule hooks run.
 		update_option( NanoPost_Email_Check_Settings::OPTION, $settings );
@@ -135,7 +145,8 @@ class NanoPost_Email_Check_CLI_Settings {
 	}
 
 	/**
-	 * The settings as the plugin uses them: saved values, with defaults filled in.
+	 * The settings as the plugin uses them: saved values or values set in code, with
+	 * defaults filled in.
 	 *
 	 * @return array
 	 */

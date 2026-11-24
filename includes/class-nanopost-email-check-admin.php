@@ -110,10 +110,12 @@ class NanoPost_Email_Check_Admin {
 	public static function field_webhook_url() {
 		$settings = NanoPost_Email_Check_Settings::get();
 		printf(
-			'<input type="url" class="large-text code" id="nanopost_email_check_webhook_url" name="%1$s[webhook_url]" value="%2$s" placeholder="https://hooks.slack.com/services/..." autocomplete="off" />',
+			'<input type="url" class="large-text code" id="nanopost_email_check_webhook_url" name="%1$s[webhook_url]" value="%2$s" placeholder="https://hooks.slack.com/services/..." autocomplete="off"%3$s />',
 			esc_attr( NanoPost_Email_Check_Settings::OPTION ),
-			esc_attr( $settings['webhook_url'] )
+			esc_attr( $settings['webhook_url'] ),
+			self::disabled( 'webhook_url' ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed attribute text.
 		);
+		self::locked_note( 'webhook_url' );
 		echo '<p class="description">';
 		esc_html_e( 'Optional. When a check fails, the plugin posts a short JSON message to this URL, and once more when checks pass again. Works with Slack, Google Chat, Discord (Slack-compatible URL) and automation services. Leave empty for no outside requests.', 'nanopost-email-check' );
 		echo ' ' . self::help_link( NanoPost_Email_Check_Help::webhook( NanoPost_Email_Check_Help::PLACE_SETTINGS ), __( 'How to set up a webhook', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
@@ -157,11 +159,13 @@ class NanoPost_Email_Check_Admin {
 		$settings = NanoPost_Email_Check_Settings::get();
 		$admin    = (string) get_option( 'admin_email' );
 		printf(
-			'<input type="email" class="regular-text" id="nanopost_email_check_recipient" name="%1$s[recipient]" value="%2$s" placeholder="%3$s" />',
+			'<input type="email" class="regular-text" id="nanopost_email_check_recipient" name="%1$s[recipient]" value="%2$s" placeholder="%3$s"%4$s />',
 			esc_attr( NanoPost_Email_Check_Settings::OPTION ),
 			esc_attr( $settings['recipient'] ),
-			esc_attr( $admin )
+			esc_attr( $admin ),
+			self::disabled( 'recipient' ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed attribute text.
 		);
+		self::locked_note( 'recipient' );
 		echo '<p class="description">';
 		printf(
 			/* translators: %s: site admin email address. */
@@ -176,11 +180,57 @@ class NanoPost_Email_Check_Admin {
 	 */
 	public static function field_interval() {
 		$current = NanoPost_Email_Check_Settings::interval();
-		printf( '<select id="nanopost_email_check_interval" name="%s[interval]">', esc_attr( NanoPost_Email_Check_Settings::OPTION ) );
+		printf(
+			'<select id="nanopost_email_check_interval" name="%1$s[interval]"%2$s>',
+			esc_attr( NanoPost_Email_Check_Settings::OPTION ),
+			self::disabled( 'interval' ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed attribute text.
+		);
 		foreach ( NanoPost_Email_Check_Settings::intervals() as $value => $label ) {
 			printf( '<option value="%1$s"%2$s>%3$s</option>', esc_attr( $value ), selected( $current, $value, false ), esc_html( $label ) );
 		}
 		echo '</select>';
+		self::locked_note( 'interval' );
+	}
+
+	/**
+	 * Disabled attribute for a field set in code. A disabled field is not sent with the
+	 * form, so saving keeps the stored value.
+	 *
+	 * @param string $key Setting key.
+	 * @return string
+	 */
+	private static function disabled( $key ) {
+		return NanoPost_Email_Check_Settings::locked( $key ) ? ' disabled="disabled"' : '';
+	}
+
+	/**
+	 * "Set in code" note under a field set by a constant or the filter.
+	 *
+	 * @param string $key Setting key.
+	 */
+	private static function locked_note( $key ) {
+		$source = NanoPost_Email_Check_Settings::source( $key );
+		if ( NanoPost_Email_Check_Settings::SOURCE_CONSTANT === $source ) {
+			$where = NanoPost_Email_Check_Settings::constant_name( $key );
+		} elseif ( NanoPost_Email_Check_Settings::SOURCE_FILTER === $source ) {
+			/* translators: %s: filter name. */
+			$where = sprintf( __( '%s filter', 'nanopost-email-check' ), NanoPost_Email_Check_Settings::FILTER );
+		} else {
+			return;
+		}
+		echo '<p class="description nanopost-email-check-locked">';
+		/* translators: %s: constant name, or filter name followed by "filter". */
+		echo esc_html( sprintf( __( 'Set in code (%s).', 'nanopost-email-check' ), $where ) );
+		echo '</p>';
+	}
+
+	/**
+	 * Errors for settings in code that were ignored because they are not valid.
+	 */
+	private static function render_code_errors() {
+		foreach ( NanoPost_Email_Check_Settings::errors() as $error ) {
+			printf( '<div class="notice notice-error nanopost-email-check-code-error"><p>%s</p></div>', esc_html( $error['message'] ) );
+		}
 	}
 
 	/**
@@ -264,6 +314,7 @@ class NanoPost_Email_Check_Admin {
 		// Screens outside the Settings menu must print these themselves. No argument, so the
 		// "Settings saved." message (stored under "general") shows too.
 		settings_errors();
+		self::render_code_errors();
 		self::render_send_notice();
 		// Section ids are stable hooks for styling, tests and documentation screenshots.
 		echo '<div id="nanopost-email-check-status">';

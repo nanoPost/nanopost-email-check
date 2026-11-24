@@ -109,6 +109,16 @@ Yes, with WP-CLI. The `wp email-check` command has these subcommands:
 
 Yes. Each site runs its own checks, with its own settings, log and notices. Network activation schedules the checks on every site, and on each new site. On a network where all sites use the same mail setup, activating the plugin on the main site is enough: network activation then sends one test email per site, which repeats the same check.
 
+= Can I set the settings in wp-config.php? =
+
+Yes. Add any of these constants to `wp-config.php` or a must-use plugin:
+
+    define( 'NANOPOST_EMAIL_CHECK_RECIPIENT', 'alerts@example.com' );
+    define( 'NANOPOST_EMAIL_CHECK_INTERVAL', 'daily' ); // twicedaily, daily or weekly
+    define( 'NANOPOST_EMAIL_CHECK_WEBHOOK_URL', 'https://hooks.slack.com/services/...' );
+
+A value set in code wins over the plugin screen, and the screen shows it read-only. It must pass the same checks as the screen: an invalid value is ignored, and the plugin screen says so. On multisite, a constant applies to every site. Developers can also use the `nanopost_email_check_settings` filter, which gets the array of settings (`recipient`, `interval`, `webhook_url`).
+
 = What happens to the data when I delete the plugin? =
 
 Deleting the plugin removes its settings, the log, the webhook state, the dismissed-notice records and the scheduled event.
