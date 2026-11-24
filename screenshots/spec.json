@@ -132,6 +132,51 @@
 			"to": "#nanopost-email-check-notice-stale",
 			"caption": "The notice when scheduled checks have stopped.",
 			"alt": "Admin notice: Email checks have stopped, with a DISABLE_WP_CRON note and links."
+		},
+		{
+			"id": "overview-notice-failed",
+			"out": "screenshots/help/overview-notice-failed.webp",
+			"width": 1280,
+			"path": "/wp-admin/index.php",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php failed"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#wpbody-content .wrap h1",
+			"to": "#nanopost-email-check-notice-failed",
+			"pad": 16,
+			"caption": "Overview: the notice on the Dashboard when a check fails.",
+			"alt": "The WordPress Dashboard with a red notice: Email check failed, the SMTP error, and links to the error page, the results and Dismiss."
+		},
+		{
+			"id": "overview-log",
+			"out": "screenshots/help/overview-log.webp",
+			"width": 1280,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-log",
+			"to": "#nanopost-email-check-log",
+			"caption": "Overview: the result log with a failure and the recovery.",
+			"alt": "A table of recent results: daily checks passed, two failed with SMTP Error: Could not authenticate, then a manual check passed and daily checks passed again."
+		},
+		{
+			"id": "overview-alert",
+			"out": "screenshots/help/overview-alert.webp",
+			"width": 1280,
+			"html": "screenshots/alert.html",
+			"data": "wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php alert",
+			"from": "#card",
+			"to": "#card",
+			"pad": 24,
+			"caption": "Overview: the webhook alert in a chat app, for a failure and the recovery.",
+			"alt": "A chat channel with two messages from Email Check: Email check failed on the site with SMTP Error: Could not authenticate, then Email check passed again."
 		}
 	]
 }

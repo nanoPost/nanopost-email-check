@@ -12,6 +12,7 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const root = path.resolve(__dirname, '..');
 const spec = JSON.parse(fs.readFileSync(path.join(__dirname, 'spec.json'), 'utf8'));
@@ -22,10 +23,11 @@ const pass = process.env.SHOT_PASSWORD || 'password';
 
 // Run a WP-CLI command in the wp-env cli container. The command is split on spaces, so
 // arguments must not contain spaces.
+// Returns the command's output.
 function wp(command) {
   const args = command.split(' ').filter(Boolean);
   if (args[0] !== 'wp') throw new Error(`Commands must start with "wp": ${command}`);
-  execFileSync('npx', ['wp-env', 'run', 'cli', ...args], { cwd: root, stdio: ['ignore', 'ignore', 'inherit'] });
+  return execFileSync('npx', ['wp-env', 'run', 'cli', ...args], { cwd: root, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
 }
 
 async function login(browser) {
@@ -51,7 +53,13 @@ async function shoot(browser, state, shot) {
     storageState: state,
   });
   const page = await context.newPage();
-  await page.goto(base + s.path, { waitUntil: 'networkidle' });
+  if (s.html) {
+    // A local page, not the site. "data" is a WP-CLI command that prints JSON for it.
+    if (s.data) await page.addInitScript((d) => { window.shotData = d; }, JSON.parse(wp(s.data)));
+    await page.goto(pathToFileURL(path.join(root, s.html)).href, { waitUntil: 'networkidle' });
+  } else {
+    await page.goto(base + s.path, { waitUntil: 'networkidle' });
+  }
 
   await page.addStyleTag({
     content:

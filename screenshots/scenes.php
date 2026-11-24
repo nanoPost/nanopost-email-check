@@ -5,7 +5,7 @@
  * Run inside wp-env:
  *   wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php <scene>
  *
- * Scenes: main, failed, stale, reset. Times are relative to now, so "x ago" texts stay the
+ * Scenes: main, failed, stale, reset, alert (prints the webhook text as JSON). Times are relative to now, so "x ago" texts stay the
  * same between runs on one day.
  *
  * @package NanoPost_Email_Check
@@ -27,6 +27,26 @@ if ( 'reset' === $scene ) {
 	delete_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META );
 	NanoPost_Email_Check_Scheduler::reschedule();
 	WP_CLI::success( 'Scene reset.' );
+	return;
+}
+
+if ( 'alert' === $scene ) {
+	// The webhook text for a failure and for the recovery, as JSON for screenshots/alert.html.
+	// Changes nothing on the site. The address is a fake one.
+	$fake_home = static function () {
+		return 'https://example.com';
+	};
+	add_filter( 'home_url', $fake_home );
+	$hook = 'https://hooks.example.com/alerts';
+	$fail = NanoPost_Email_Check_Webhook::payload( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, 'SMTP Error: Could not authenticate.' ), $hook );
+	$pass = NanoPost_Email_Check_Webhook::payload( new NanoPost_Email_Check_Result( 'wp_mail', 'manual', true ), $hook );
+	remove_filter( 'home_url', $fake_home );
+	echo wp_json_encode(
+		array(
+			'fail' => $fail['text'],
+			'pass' => $pass['text'],
+		)
+	);
 	return;
 }
 

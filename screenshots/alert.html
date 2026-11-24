@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Webhook alert</title>
+<!--
+	A neutral chat card with the webhook text, for the screenshots. Not any real chat app.
+	shoot.cjs passes the text from the plugin (scenes.php alert) as window.shotData.
+	The times are made up: they are not plugin text.
+-->
+<style>
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		padding: 56px 24px;
+		background: #f0f0f1;
+		color: #1e1e1e;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+		font-size: 15px;
+		line-height: 1.5;
+	}
+	.card {
+		max-width: 760px;
+		margin: 0 auto;
+		background: #fff;
+		border: 1px solid #dcdcde;
+		border-radius: 12px;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
+		overflow: hidden;
+	}
+	.head {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 14px 20px;
+		border-bottom: 1px solid #ececee;
+		font-weight: 600;
+	}
+	.head .dot { width: 10px; height: 10px; border-radius: 50%; background: #8c8f94; }
+	.head .sub { font-weight: 400; color: #646970; font-size: 13px; }
+	.list { padding: 8px 0; }
+	.day {
+		margin: 8px 20px 4px;
+		color: #646970;
+		font-size: 12px;
+		text-align: center;
+	}
+	.msg { display: flex; gap: 12px; padding: 10px 20px; }
+	.avatar { flex: none; width: 40px; height: 40px; border-radius: 8px; overflow: hidden; }
+	.avatar img { display: block; width: 100%; height: 100%; }
+	.meta { display: flex; align-items: baseline; gap: 8px; }
+	.name { font-weight: 600; }
+	.tag {
+		padding: 0 6px;
+		border-radius: 4px;
+		background: #f0f0f1;
+		color: #50575e;
+		font-size: 11px;
+		font-weight: 600;
+	}
+	.time { color: #646970; font-size: 12px; }
+	.text { margin-top: 2px; word-break: break-word; }
+	.text a { color: #2271b1; text-decoration: none; }
+	.compose {
+		margin: 8px 20px 20px;
+		padding: 10px 14px;
+		border: 1px solid #dcdcde;
+		border-radius: 8px;
+		color: #8c8f94;
+	}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+	<div class="head"><span class="dot"></span>Site alerts <span class="sub">Webhook messages</span></div>
+	<div class="list">
+		<div class="day">Today</div>
+		<div class="msg">
+			<div class="avatar"><img src="../.wordpress-org/icon.svg" alt=""></div>
+			<div>
+				<div class="meta"><span class="name">Email Check</span><span class="tag">Webhook</span><span class="time">6:45 AM</span></div>
+				<div class="text" data-key="fail"></div>
+			</div>
+		</div>
+		<div class="msg">
+			<div class="avatar"><img src="../.wordpress-org/icon.svg" alt=""></div>
+			<div>
+				<div class="meta"><span class="name">Email Check</span><span class="tag">Webhook</span><span class="time">9:43 AM</span></div>
+				<div class="text" data-key="pass"></div>
+			</div>
+		</div>
+	</div>
+	<div class="compose">Write a message</div>
+</div>
+<script>
+	// Sample text, used only when the page is opened without shoot.cjs.
+	var data = window.shotData || {
+		fail: 'Email check failed on https://example.com: SMTP Error: Could not authenticate.',
+		pass: 'Email check passed again on https://example.com.'
+	};
+	// Show the text as a chat app does: plain text, with web addresses as links.
+	document.querySelectorAll('[data-key]').forEach(function (el) {
+		// Chat apps show the escaped &amp;, &lt; and &gt; as the plain characters.
+		var text = (data[el.dataset.key] || '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+		var re = /https?:\/\/[^\s<>]*[^\s<>.,:;!?)]/g;
+		var last = 0, m;
+		while ((m = re.exec(text))) {
+			el.appendChild(document.createTextNode(text.slice(last, m.index)));
+			var a = document.createElement('a');
+			a.href = m[0];
+			a.textContent = m[0];
+			el.appendChild(a);
+			last = m.index + m[0].length;
+		}
+		el.appendChild(document.createTextNode(text.slice(last)));
+	});
+</script>
+</body>
+</html>
