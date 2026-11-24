@@ -243,7 +243,7 @@ NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'manu
 list( $np_code, $np_data ) = np_cli_status();
 np_assert( 0 === $np_code && 'ok' === $np_data['state'], 'status: scheduled, last check passed: ok, exit 0', array( $np_code, $np_data ) );
 np_assert( 'daily' === $np_data['interval'] && (bool) preg_match( '/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00$/', (string) $np_data['next_run'] ), 'status: interval and next run (ISO 8601 UTC)', $np_data );
-np_assert( array( 'state', 'last_check', 'failed_check', 'mailer', 'interval', 'settings', 'code_errors', 'next_run', 'stopped_since', 'webhook' ) === array_keys( $np_data ), 'status: JSON fields', array_keys( $np_data ) );
+np_assert( array( 'state', 'last_check', 'failed_check', 'mailer', 'interval', 'settings', 'code_errors', 'next_run', 'cron', 'stopped_since', 'webhook' ) === array_keys( $np_data ), 'status: JSON fields', array_keys( $np_data ) );
 np_assert(
 	array(
 		'url_set'       => false,
@@ -315,6 +315,51 @@ np_assert( 3 === $np_code && $np_d && true === $np_d['ok'] && true === $np_d['te
 np_assert( false === strpos( wp_json_encode( $np_data ), 'hooks.slack.com' ), 'status: the webhook URL is not printed' );
 $np_out = np_cli( 'status' );
 np_assert( false !== strpos( $np_out->stdout, 'Last webhook message (test alert):' ), 'status: the table names the test alert', $np_out->stdout );
+
+// ---------------------------------------------------------------------------------------
+np_section( 'WP-CLI: WP-Cron in status' );
+np_reset();
+NanoPost_Email_Check_Scheduler::ensure_scheduled();
+list( , $np_data ) = np_cli_status();
+np_assert( array( 'disabled', 'alternate', 'oldest_overdue' ) === array_keys( $np_data['cron'] ), 'status: cron fields', $np_data['cron'] );
+np_assert( NanoPost_Email_Check_Alerts::wp_cron_disabled() === $np_data['cron']['disabled'], 'status: cron.disabled follows DISABLE_WP_CRON', $np_data['cron'] );
+
+// An event due for more than 10 minutes shows that nothing has run WP-Cron since then.
+$np_cron_saved = _get_cron_array();
+_set_cron_array( array() );
+NanoPost_Email_Check_Scheduler::ensure_scheduled();
+list( , $np_data ) = np_cli_status();
+np_assert( null === $np_data['cron']['oldest_overdue'], 'status: no overdue event', $np_data['cron'] );
+wp_schedule_single_event( time() - HOUR_IN_SECONDS, 'nanopost_email_check_test_overdue' );
+list( , $np_data ) = np_cli_status();
+np_assert( is_string( $np_data['cron']['oldest_overdue'] ), 'status: the oldest overdue event is reported', $np_data['cron'] );
+$np_out = np_cli( 'status' );
+np_assert( false !== strpos( $np_out->stdout, 'nothing has run WP-Cron since then' ), 'status table: says WP-Cron has not run', $np_out->stdout );
+np_assert( false !== strpos( $np_out->stdout, "WP-Cron\t" ), 'status table: has a WP-Cron row', $np_out->stdout );
+_set_cron_array( $np_cron_saved );
+
+// ---------------------------------------------------------------------------------------
+np_section( 'WP-CLI: run explains the shell line of a missing sendmail program' );
+np_reset();
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'owner@example.com' ) );
+remove_all_actions( 'phpmailer_init' );
+$np_no_send = static function ( $mailer ) {
+	$mailer->clearAllRecipients();
+};
+add_action( 'phpmailer_init', $np_no_send );
+$np_missing = static function () {
+	return '/nonexistent/np-sendmail -t -i';
+};
+add_filter( 'nanopost_email_check_sendmail_command', $np_missing );
+$np_out = np_cli( 'run' );
+remove_filter( 'nanopost_email_check_sendmail_command', $np_missing );
+remove_action( 'phpmailer_init', $np_no_send );
+np_assert( 0 === strpos( $np_out->stdout, 'Sending a test email to owner@example.com' ), 'run: says what it sends before it sends', $np_out->stdout );
+np_assert( 1 === $np_out->return_code && false !== strpos( $np_out->stdout, 'comes from the shell that PHP started' ), 'run: a sendmail failure explains the shell line', $np_out->stdout );
+
+np_reset();
+$np_out = np_cli( 'run' );
+np_assert( false === strpos( $np_out->stdout, 'comes from the shell' ), 'run: no shell note for other results', $np_out->stdout );
 
 // ---------------------------------------------------------------------------------------
 np_section( 'WP-CLI: test-alert' );

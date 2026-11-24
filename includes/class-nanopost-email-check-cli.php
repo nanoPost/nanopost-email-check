@@ -61,6 +61,8 @@ class NanoPost_Email_Check_CLI {
 	 *     Success: WordPress accepted the test email for owner@example.com. Check that inbox (and the spam folder) to confirm it arrived.
 	 */
 	public function run() {
+		/* translators: %s: recipient email address. */
+		WP_CLI::log( sprintf( __( 'Sending a test email to %s ...', 'nanopost-email-check' ), NanoPost_Email_Check_Settings::recipient() ) );
 		$results = NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_CLI );
 
 		if ( empty( $results ) ) {
@@ -90,6 +92,9 @@ class NanoPost_Email_Check_CLI {
 			WP_CLI::log( sprintf( __( 'Error text: %s', 'nanopost-email-check' ), $result->error_message() ) );
 			/* translators: %s: URL of a help page. */
 			WP_CLI::log( sprintf( __( 'What this error means: %s', 'nanopost-email-check' ), NanoPost_Email_Check_Help::for_failure( $result, NanoPost_Email_Check_Help::PLACE_CLI ) ) );
+			if ( self::sendmail_failure( $result ) ) {
+				WP_CLI::log( __( 'Note: a line such as "sh: 1: ...: not found" above comes from the shell that PHP started for the sendmail program. It is the same error.', 'nanopost-email-check' ) );
+			}
 		}
 
 		WP_CLI::error(
@@ -238,6 +243,7 @@ class NanoPost_Email_Check_CLI {
 			'settings'      => self::settings_sources(),
 			'code_errors'   => wp_list_pluck( NanoPost_Email_Check_Settings::errors(), 'message' ),
 			'next_run'      => $next ? self::iso_time( (int) $next ) : null,
+			'cron'          => self::cron_data(),
 			'stopped_since' => null === $stale ? null : self::iso_time( $stale ),
 			'webhook'       => array(
 				'url_set'       => $url_set,
@@ -248,6 +254,45 @@ class NanoPost_Email_Check_CLI {
 					'test'   => ! empty( $delivery['test'] ),
 				),
 			),
+		);
+	}
+
+	/**
+	 * True when a check failed because the sendmail program for PHP mail(), sendmail or
+	 * qmail is missing or not executable. Then the shell PHP starts has printed its own
+	 * error line on stderr, which this command cannot hold back.
+	 *
+	 * @param NanoPost_Email_Check_Result $result Failed result.
+	 * @return bool
+	 */
+	private static function sendmail_failure( $result ) {
+		$types = array( NanoPost_Email_Check_Mailer::TYPE_MAIL, NanoPost_Email_Check_Mailer::TYPE_SENDMAIL, NanoPost_Email_Check_Mailer::TYPE_QMAIL );
+		return in_array( $result->mailer['type'], $types, true ) && 1 === preg_match( '/\((sendmail_path|Sendmail) ".*": .+ (not found|not executable)\)$/', $result->error );
+	}
+
+	/**
+	 * Whether WP-Cron runs on this site, as far as the site can tell. It cannot see the
+	 * server's cron jobs, but an event that has been due for a while shows that nothing has
+	 * run WP-Cron since then.
+	 *
+	 * @return array disabled (DISABLE_WP_CRON), alternate (ALTERNATE_WP_CRON), and
+	 *               oldest_overdue: ISO 8601 time of the oldest event due for more than
+	 *               10 minutes, or null.
+	 */
+	private static function cron_data() {
+		$crons  = function_exists( '_get_cron_array' ) ? _get_cron_array() : array();
+		$oldest = null;
+		if ( is_array( $crons ) && $crons ) {
+			$first = (int) min( array_keys( $crons ) );
+			if ( $first > 0 && $first < time() - 10 * MINUTE_IN_SECONDS ) {
+				$oldest = self::iso_time( $first );
+			}
+		}
+
+		return array(
+			'disabled'       => NanoPost_Email_Check_Alerts::wp_cron_disabled(),
+			'alternate'      => defined( 'ALTERNATE_WP_CRON' ) && ALTERNATE_WP_CRON,
+			'oldest_overdue' => $oldest,
 		);
 	}
 
@@ -348,6 +393,22 @@ class NanoPost_Email_Check_CLI {
 					__( '%1$s. Next check: %2$s', 'nanopost-email-check' ),
 					NanoPost_Email_Check_Settings::intervals()[ $data['interval'] ],
 					NanoPost_Email_Check_Admin::format_time( self::unix_time( $data['next_run'] ) )
+				)
+			);
+		}
+
+		if ( $data['cron']['disabled'] ) {
+			$add( __( 'WP-Cron', 'nanopost-email-check' ), __( 'Disabled in wp-config.php (DISABLE_WP_CRON). Scheduled checks run only when a server cron job runs "wp cron event run --due-now" or requests wp-cron.php. This command cannot see the server\'s cron jobs.', 'nanopost-email-check' ) );
+		} else {
+			$add( __( 'WP-Cron', 'nanopost-email-check' ), __( 'Enabled. Scheduled checks run when the site gets a visit after they are due.', 'nanopost-email-check' ) );
+		}
+		if ( null !== $data['cron']['oldest_overdue'] ) {
+			$add(
+				'',
+				sprintf(
+					/* translators: %s: date and time. */
+					__( 'An event has been due since %s: nothing has run WP-Cron since then.', 'nanopost-email-check' ),
+					NanoPost_Email_Check_Admin::format_time( self::unix_time( $data['cron']['oldest_overdue'] ) )
 				)
 			);
 		}

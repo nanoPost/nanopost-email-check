@@ -110,7 +110,7 @@ Yes, with WP-CLI. The `wp email-check` command has these subcommands:
 
 * `wp email-check settings get` and `wp email-check settings set <key> <value>`: show or change a setting. The keys are `recipient`, `interval` (`twicedaily`, `daily` or `weekly`) and `webhook_url`. A value is checked with the same rules as the plugin screen. An invalid value changes nothing and exits with 1.
 * `wp email-check run`: send a test email now. The log shows "WP-CLI" as what started it. Exits with 0 when the check passed and 1 when it failed.
-* `wp email-check status`: show whether the checks run and pass. Add `--format=json` for scripts. Exits with 0 when all is well, 1 when the last check failed, 2 when scheduled checks have stopped or are not scheduled, and 3 when no check has run yet.
+* `wp email-check status`: show whether the checks run and pass, and whether WP-Cron is disabled or has stopped running events. Add `--format=json` for scripts. Exits with 0 when all is well, 1 when the last check failed, 2 when scheduled checks have stopped or are not scheduled, and 3 when no check has run yet.
 * `wp email-check test-alert`: send a test alert to the saved webhook URL. Exits with 0 when the receiver accepted it, and 1 otherwise.
 
 `run` and `test-alert` have no once-a-minute limit. On multisite, choose the site with `--url`. For details, run `wp help email-check`, or read [settings in code and WP-CLI](https://nanopo.st/email-check-plugin/code-and-cli/).
@@ -166,6 +166,10 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.5.0 =
+* WP-CLI: `wp email-check status` says whether WP-Cron is disabled in `wp-config.php`, and whether an event has been due for more than 10 minutes, which shows that nothing has run WP-Cron since then.
+* WP-CLI: `wp email-check run` says what it sends before it sends. When PHP `mail()` fails because the sendmail program is missing, it explains the shell's own error line.
 
 = 1.4.0 =
 * Mailer: Status, the log and `wp email-check status` name the plugin that set up the mailer, for example "Sends through SMTP smtp.example.com:587, set up by WP Mail SMTP". The plugin is named only when all other `phpmailer_init` callbacks belong to one plugin.
