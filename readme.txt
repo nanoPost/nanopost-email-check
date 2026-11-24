@@ -18,7 +18,7 @@ nanoPost Email Check sends a test email on a schedule, logs every result, and pu
 
 = What to expect =
 
-1. **Set up in about two minutes.** Choose the mailbox for the test emails and how often to check, then press **Send test now** to see a first result.
+1. **Set up on one screen.** Choose the mailbox for the test emails and how often to check, then press **Send test now** to see a first result.
 2. **Then there is nothing to do.** A short test email arrives on schedule, daily by default. The plugin keeps a log of every result.
 3. **When sending breaks,** a notice in wp-admin shows the error and links to a plain-language explanation. With a webhook set, a message also goes to Slack, Google Chat, Discord or another chat app, so the alert does not depend on the email that just broke.
 4. **When it is fixed,** the next passing check clears the notice, and the webhook sends one message to say email works again.
