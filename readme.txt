@@ -28,7 +28,7 @@ nanoPost Email Check sends a test email on a schedule and logs each result. It s
 
 * **Site owners** who want to hear about a mail problem before a customer does.
 * **Shops and lead-form sites,** where a lost order confirmation or enquiry is lost business.
-* **Agencies and maintainers,** who want a message in the team chat when a client site stops sending.
+* **Agencies and maintainers,** who want a message in the team chat when a client site stops sending, and who set up many sites with WP-CLI or `wp-config.php`.
 
 = How it differs from SMTP and email log plugins =
 
@@ -45,6 +45,8 @@ SMTP and email log plugins send and record the site's real mail, and some of the
 * **Send test alert:** check the webhook without waiting for a real failure.
 * **Troubleshooting help:** links from failed or stopped checks to help pages on nanopo.st, including an error decoder.
 * **WP-CLI:** `wp email-check` changes the settings, runs a check, shows the status and sends a test alert, with exit codes for scripts.
+* **Settings in code:** set the recipient, interval and webhook URL in `wp-config.php`. The plugin screen shows them read-only.
+* **Mailer shown:** each result records how the site sends: SMTP server and port, PHP `mail()`, or another plugin. When PHP `mail()` fails because the sendmail program is missing, the error says so.
 * **Multisite:** each site runs its own checks, with its own settings, log and notices.
 * **No outside requests** unless you set a webhook. Nothing is sent to nanoPost.
 
@@ -71,6 +73,14 @@ Writing about the plugin? The [reviewer's guide](https://nanopo.st/email-check-p
 5. Press **Send test now** and check that the email arrives.
 
 The first scheduled check runs one interval after activation. Changing the schedule starts the count again.
+
+With WP-CLI:
+
+    wp plugin install nanopost-email-check --activate
+    wp email-check settings set recipient alerts@example.com
+    wp email-check run
+
+See "Can I set it up from the command line?" below.
 
 == Frequently Asked Questions ==
 
@@ -107,7 +117,7 @@ Yes, with WP-CLI. The `wp email-check` command has these subcommands:
 
 = Does it work on multisite? =
 
-Yes. Each site runs its own checks, with its own settings, log and notices. Network activation schedules the checks on every site, and on each new site. On a network where all sites use the same mail setup, activating the plugin on the main site is enough: network activation then sends one test email per site, which repeats the same check.
+Yes. Each site runs its own checks, with its own settings, log and notices. Network activation schedules the checks on every site, and on each new site. On a network of more than 10,000 sites, each site is scheduled on its next request instead. On a network where all sites use the same mail setup, activating the plugin on the main site is enough: network activation then sends one test email per site, which repeats the same check.
 
 = Can I set the settings in wp-config.php? =
 
@@ -131,7 +141,7 @@ The plugin makes no outside requests unless you set a webhook URL.
 
 When you enter a webhook URL, the plugin sends an HTTP POST to that URL when a check fails, and once when checks pass again after a failure. The JSON body holds a short text line, the site address, the status (fail or pass), the error text and the time of the check. For a Google Chat URL, only the text line is sent. The request goes only to the URL you enter, and it is governed by the terms and privacy policy of the service that URL belongs to. Leave the field empty to send nothing.
 
-The "Send test alert" button on the plugin screen, or `wp email-check test-alert`, sends one test message to the saved URL, only when you use it. Its text says that it is a test and that no check failed. It has the same fields as a failure message, plus `"test": true`, so a receiver can handle it like a real alert or skip it. Real alerts do not have the `test` field. For a Google Chat URL, only the text line is sent. Example:
+The "Send test alert" button on the plugin screen, or `wp email-check test-alert`, sends one test message to the webhook URL, only when you use it. Its text says that it is a test and that no check failed. It has the same fields as a failure message, plus `"test": true`, so a receiver can handle it like a real alert or skip it. Real alerts do not have the `test` field. For a Google Chat URL, only the text line is sent. Example:
 
 `{"text": "Test alert from Email Check on https://example.com. This is only a test of the webhook. No check failed.", "site": "https://example.com", "status": "fail", "error": "Test alert. No check failed.", "time": "2026-11-24T09:30:00+00:00", "test": true}`
 
@@ -156,6 +166,12 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.3.0 =
+* WP-CLI: `wp email-check` with `settings get` and `settings set`, `run`, `status` and `test-alert`, with exit codes for scripts. A check started this way shows "WP-CLI" in the log.
+* Settings in code: the constants `NANOPOST_EMAIL_CHECK_RECIPIENT`, `NANOPOST_EMAIL_CHECK_INTERVAL` and `NANOPOST_EMAIL_CHECK_WEBHOOK_URL`, and the `nanopost_email_check_settings` filter. The plugin screen shows these settings read-only.
+* The mailer of each check (SMTP server and port, PHP `mail()`, or another plugin) is shown in Status and in the log.
+* When PHP `mail()` fails because the sendmail program is missing, the error names it.
 
 = 1.2.1 =
 * Multisite: network activation now schedules the checks on every site, and on each new site. Sites left without a schedule by an earlier network activation are scheduled on their next request.
