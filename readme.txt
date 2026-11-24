@@ -112,6 +112,10 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 
 == Changelog ==
 
+= 1.2.0 =
+* Send test alert: a button under the webhook URL posts a test message to the saved URL, at most once a minute per site. The message says that it is a test, and its JSON has `"test": true`. The webhook status shows when the last message was a test.
+* A link to rate the plugin on WordPress.org, at the bottom of the plugin screen.
+
 = 1.1.0 =
 * Send test now runs at most once a minute per site.
 * Error text is cut at 4,000 characters in the log, the notices and the webhook.
