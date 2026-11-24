@@ -1030,6 +1030,8 @@ np_assert( 'https://nanopo.st/email-check-plugin/?utm_source=wp-admin&utm_medium
 np_assert( 'https://nanopo.st/email-check-plugin/cron/?utm_source=wp-admin&utm_medium=email-check&utm_content=notice-stale' === NanoPost_Email_Check_Help::cron( NanoPost_Email_Check_Help::PLACE_NOTICE_STALE ), 'cron link from the stale notice' );
 np_assert( 'https://nanopo.st/email-check-plugin/?utm_source=wp-admin&utm_medium=email-check&utm_content=header' === NanoPost_Email_Check_Help::home( NanoPost_Email_Check_Help::PLACE_HEADER ), 'home link from the page title' );
 
+require __DIR__ . '/integration-diagnostics.php';
+
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );
 update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'x@example.com' ) );
