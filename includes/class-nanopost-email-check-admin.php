@@ -8,7 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Settings form, "Send test now" and the result log.
+ * Settings form, "Send test alert", "Send test now" and the result log.
  */
 class NanoPost_Email_Check_Admin {
 
@@ -17,6 +17,10 @@ class NanoPost_Email_Check_Admin {
 	const CAPABILITY  = 'manage_options';
 	const SEND_LOCK   = 'nanopost_email_check_send_lock';
 
+	const TEST_ALERT_ACTION = 'nanopost_email_check_test_alert';
+	const TEST_ALERT_LOCK   = 'nanopost_email_check_test_alert_lock';
+	const TEST_ALERT_FORM   = 'nanopost-email-check-test-alert';
+
 	/**
 	 * Register hooks.
 	 */
@@ -24,6 +28,7 @@ class NanoPost_Email_Check_Admin {
 		add_action( 'admin_menu', array( __CLASS__, 'add_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
 		add_action( 'admin_post_' . self::SEND_ACTION, array( __CLASS__, 'handle_send' ) );
+		add_action( 'admin_post_' . self::TEST_ALERT_ACTION, array( __CLASS__, 'handle_test_alert' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( NANOPOST_EMAIL_CHECK_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -98,7 +103,7 @@ class NanoPost_Email_Check_Admin {
 	}
 
 	/**
-	 * Webhook URL field, with the result of the last delivery.
+	 * Webhook URL field, with "Send test alert" and the result of the last delivery.
 	 */
 	public static function field_webhook_url() {
 		$settings = NanoPost_Email_Check_Settings::get();
@@ -112,17 +117,32 @@ class NanoPost_Email_Check_Admin {
 		echo ' ' . self::help_link( NanoPost_Email_Check_Help::webhook(), __( 'How to set up a webhook', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 		echo '</p>';
 
+		// The button belongs to a separate form after the settings form (forms cannot be
+		// nested). It sends to the saved URL only.
+		echo '<p>';
+		if ( '' !== $settings['webhook_url'] ) {
+			printf( '<button type="submit" class="button" form="%1$s">%2$s</button> ', esc_attr( self::TEST_ALERT_FORM ), esc_html__( 'Send test alert', 'nanopost-email-check' ) );
+			echo '<span class="description">' . esc_html__( 'Sends a test message to the saved URL.', 'nanopost-email-check' ) . '</span>';
+		} else {
+			echo '<button type="button" class="button" disabled="disabled">' . esc_html__( 'Send test alert', 'nanopost-email-check' ) . '</button> ';
+			echo '<span class="description">' . esc_html__( 'Save a webhook URL to send a test alert.', 'nanopost-email-check' ) . '</span>';
+		}
+		echo '</p>';
+
 		$delivery = NanoPost_Email_Check_Webhook::state()['last_delivery'];
 		if ( '' !== $settings['webhook_url'] && ! empty( $delivery['time'] ) ) {
+			$args = array(
+				self::format_time( (int) $delivery['time'] ),
+				! empty( $delivery['ok'] ) ? __( 'delivered', 'nanopost-email-check' ) : __( 'failed', 'nanopost-email-check' ),
+				isset( $delivery['detail'] ) ? (string) $delivery['detail'] : '',
+			);
 			echo '<p class="description">';
 			echo esc_html(
-				sprintf(
+				empty( $delivery['test'] )
 					/* translators: 1: date and time, 2: "delivered" or "failed", 3: HTTP status or error text. */
-					__( 'Last webhook message: %1$s, %2$s (%3$s).', 'nanopost-email-check' ),
-					self::format_time( (int) $delivery['time'] ),
-					! empty( $delivery['ok'] ) ? __( 'delivered', 'nanopost-email-check' ) : __( 'failed', 'nanopost-email-check' ),
-					isset( $delivery['detail'] ) ? (string) $delivery['detail'] : ''
-				)
+					? vsprintf( __( 'Last webhook message: %1$s, %2$s (%3$s).', 'nanopost-email-check' ), $args )
+					/* translators: 1: date and time, 2: "delivered" or "failed", 3: HTTP status or error text. */
+					: vsprintf( __( 'Last webhook message (test alert): %1$s, %2$s (%3$s).', 'nanopost-email-check' ), $args )
 			);
 			echo '</p>';
 		}
@@ -192,7 +212,33 @@ class NanoPost_Email_Check_Admin {
 	}
 
 	/**
-	 * Per-user key for the one-time "Send test now" notice.
+	 * Handle "Send test alert". Posts a test message to the saved webhook URL, stores the
+	 * outcome for one notice, returns to the screen. At most one test alert per site each
+	 * minute.
+	 */
+	public static function handle_test_alert() {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to send test alerts.', 'nanopost-email-check' ), 403 );
+		}
+		check_admin_referer( self::TEST_ALERT_ACTION );
+
+		if ( '' === NanoPost_Email_Check_Settings::webhook_url() ) {
+			$outcome = 'alert-none';
+		} elseif ( false !== get_transient( self::TEST_ALERT_LOCK ) ) {
+			$outcome = 'alert-wait';
+		} else {
+			set_transient( self::TEST_ALERT_LOCK, 1, MINUTE_IN_SECONDS );
+			$delivery = NanoPost_Email_Check_Webhook::send_test();
+			$outcome  = ! empty( $delivery['ok'] ) ? 'alert-sent' : 'alert-failed';
+		}
+
+		set_transient( self::notice_key(), $outcome, MINUTE_IN_SECONDS );
+		wp_safe_redirect( self::page_url() );
+		exit;
+	}
+
+	/**
+	 * Per-user key for the one-time "Send test now" and "Send test alert" notice.
 	 *
 	 * @return string
 	 */
@@ -228,6 +274,13 @@ class NanoPost_Email_Check_Admin {
 		submit_button();
 		echo '</form>';
 
+		if ( '' !== NanoPost_Email_Check_Settings::webhook_url() ) {
+			echo '<form id="' . esc_attr( self::TEST_ALERT_FORM ) . '" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			echo '<input type="hidden" name="action" value="' . esc_attr( self::TEST_ALERT_ACTION ) . '" />';
+			wp_nonce_field( self::TEST_ALERT_ACTION, '_wpnonce', false );
+			echo '</form>';
+		}
+
 		echo '<div id="nanopost-email-check-send">';
 		self::render_send_form();
 		echo '</div>';
@@ -240,7 +293,7 @@ class NanoPost_Email_Check_Admin {
 	}
 
 	/**
-	 * One-time notice after "Send test now".
+	 * One-time notice after "Send test now" or "Send test alert".
 	 */
 	private static function render_send_notice() {
 		$outcome = get_transient( self::notice_key() );
@@ -249,7 +302,24 @@ class NanoPost_Email_Check_Admin {
 		}
 		delete_transient( self::notice_key() );
 
-		if ( 'wait' === $outcome ) {
+		$delivery = NanoPost_Email_Check_Webhook::state()['last_delivery'];
+		$detail   = isset( $delivery['detail'] ) ? (string) $delivery['detail'] : '';
+
+		if ( 'alert-sent' === $outcome ) {
+			$class = 'notice-success';
+			/* translators: %s: HTTP status, such as "200 OK". */
+			$message = sprintf( __( 'The test alert was delivered (%s). Check that it arrived.', 'nanopost-email-check' ), $detail );
+		} elseif ( 'alert-failed' === $outcome ) {
+			$class = 'notice-error';
+			/* translators: %s: HTTP status or error text. */
+			$message = sprintf( __( 'The test alert was not delivered (%s). Check the webhook URL.', 'nanopost-email-check' ), $detail );
+		} elseif ( 'alert-wait' === $outcome ) {
+			$class   = 'notice-warning';
+			$message = __( 'A test alert was sent less than one minute ago. Wait one minute, then try again.', 'nanopost-email-check' );
+		} elseif ( 'alert-none' === $outcome ) {
+			$class   = 'notice-error';
+			$message = __( 'No webhook URL is saved. Save a webhook URL first, then send a test alert.', 'nanopost-email-check' );
+		} elseif ( 'wait' === $outcome ) {
 			$class   = 'notice-warning';
 			$message = __( 'A test email was sent less than one minute ago. Wait one minute, then try again.', 'nanopost-email-check' );
 		} elseif ( 'passed' === $outcome ) {

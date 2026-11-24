@@ -86,6 +86,10 @@ The plugin makes no outside requests unless you set a webhook URL.
 
 When you enter a webhook URL, the plugin sends an HTTP POST to that URL when a check fails, and once when checks pass again after a failure. The JSON body holds a short text line, the site address, the status (fail or pass), the error text and the time of the check. For a Google Chat URL, only the text line is sent. The request goes only to the URL you enter, and it is governed by the terms and privacy policy of the service that URL belongs to. Leave the field empty to send nothing.
 
+The "Send test alert" button on the plugin screen sends one test message to the saved URL, only when you click it. Its text says that it is a test and that no check failed. It has the same fields as a failure message, plus `"test": true`, so a receiver can handle it like a real alert or skip it. Real alerts do not have the `test` field. For a Google Chat URL, only the text line is sent. Example:
+
+`{"text": "Test alert from Email Check on https://example.com. This is only a test of the webhook. No check failed.", "site": "https://example.com", "status": "fail", "error": "Test alert. No check failed.", "time": "2026-11-24T09:30:00+00:00", "test": true}`
+
 The setup help names these services. The plugin sends to them only when you enter one of their webhook URLs:
 
 * Slack incoming webhooks: [terms](https://slack.com/terms-of-service), [privacy policy](https://slack.com/trust/privacy/privacy-policy)

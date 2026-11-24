@@ -18,6 +18,7 @@ function nanopost_email_check_uninstall_site() {
 	delete_option( 'nanopost_email_check_webhook_state' );
 	delete_option( 'nanopost_email_check_schedule_state' );
 	delete_transient( 'nanopost_email_check_send_lock' );
+	delete_transient( 'nanopost_email_check_test_alert_lock' );
 	wp_clear_scheduled_hook( 'nanopost_email_check_run' );
 
 	// Dismissed notices are stored per site as a user option (blog prefix + key).

@@ -104,6 +104,7 @@ function np_reset() {
 	delete_option( NanoPost_Email_Check_Scheduler::STATE_OPTION );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 	delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+	delete_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK );
 	global $wpdb;
 	delete_metadata( 'user', 0, $wpdb->get_blog_prefix() . NanoPost_Email_Check_Alerts::DISMISSED_META, '', true );
 }
@@ -712,6 +713,135 @@ remove_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_fake_u
 wp_set_current_user( 0 );
 
 // ---------------------------------------------------------------------------------------
+np_section( 'Webhook: Send test alert' );
+np_reset();
+NanoPost_Email_Check_Admin::register_settings();
+set_current_screen( 'dashboard' );
+$np_alert_notice = 'nanopost_email_check_sent_' . $np_admin_id;
+
+/**
+ * Render the plugin screen and return the HTML.
+ *
+ * @return string
+ */
+function np_render_screen() {
+	ob_start();
+	NanoPost_Email_Check_Admin::render();
+	return ob_get_clean();
+}
+
+/**
+ * Parse screen HTML for XPath queries.
+ *
+ * @param string $html HTML.
+ * @return DOMXPath
+ */
+function np_xpath( $html ) {
+	$dom = new DOMDocument();
+	libxml_use_internal_errors( true );
+	$dom->loadHTML( '<!doctype html><html><body>' . $html . '</body></html>' );
+	libxml_clear_errors();
+	return new DOMXPath( $dom );
+}
+
+// No saved URL: the button is shown disabled with a reason, and the handler sends nothing.
+wp_set_current_user( $np_admin_id );
+$np_x = np_xpath( np_render_screen() );
+np_assert( 1 === $np_x->query( '//button[@disabled and contains(., "Send test alert")]' )->length, 'no URL: the button is disabled' );
+np_assert( 0 === $np_x->query( '//button[not(@disabled) and contains(., "Send test alert")]' )->length, 'no URL: no active button' );
+np_assert( 0 === $np_x->query( '//form[@id="nanopost-email-check-test-alert"]' )->length, 'no URL: no test alert form' );
+$np_n = count( $GLOBALS['np_requests'] );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::TEST_ALERT_ACTION ) );
+$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) );
+np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ), 'no URL: returns to the screen', $np_out );
+np_assert( count( $GLOBALS['np_requests'] ) === $np_n, 'no URL: no request' );
+np_assert( 'alert-none' === get_transient( $np_alert_notice ), 'no URL: asks to save a URL first' );
+np_assert( false !== strpos( np_render_screen(), 'No webhook URL is saved' ), 'no URL: the notice is shown' );
+delete_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK );
+
+// Capability and nonce.
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'webhook_url' => 'https://hooks.slack.com/services/T/B/x' ) );
+update_option(
+	NanoPost_Email_Check_Webhook::STATE_OPTION,
+	array(
+		'last_status' => array( 'wp_mail' => 'fail' ),
+		'url_hash'    => md5( 'https://hooks.slack.com/services/T/B/x' ),
+	)
+);
+wp_set_current_user( $np_editor_id );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::TEST_ALERT_ACTION ) );
+np_assert( 'die:403' === np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) ), 'test alert: an editor is refused, even with a valid nonce' );
+wp_set_current_user( $np_admin_id );
+np_nonce( null );
+np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) ), 'die:' ), 'test alert: no nonce is refused' );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::SEND_ACTION ) );
+np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) ), 'die:' ), 'test alert: the "Send test now" nonce is refused' );
+np_assert( count( $GLOBALS['np_requests'] ) === $np_n, 'test alert: no request without the right user and nonce' );
+
+// The form: the button sits in the settings form but submits its own form, with the nonce.
+$np_x    = np_xpath( np_render_screen() );
+$np_btn  = $np_x->query( '//form[@id="nanopost-email-check-settings"]//button[@form="nanopost-email-check-test-alert" and contains(., "Send test alert")]' );
+$np_form = $np_x->query( '//form[@id="nanopost-email-check-test-alert"]' );
+np_assert( 1 === $np_btn->length && 1 === $np_form->length, 'URL saved: the button submits the test alert form' );
+np_assert( 0 === $np_x->query( '//form[@id="nanopost-email-check-settings"]//form' )->length, 'the forms are not nested' );
+np_assert( 1 === $np_x->query( '//form[@id="nanopost-email-check-test-alert" and @method="post"]/input[@name="action" and @value="' . NanoPost_Email_Check_Admin::TEST_ALERT_ACTION . '"]' )->length, 'the form posts the test alert action' );
+$np_nonce_el = $np_x->query( '//form[@id="nanopost-email-check-test-alert"]/input[@name="_wpnonce"]' );
+np_assert( 1 === $np_nonce_el->length && false !== wp_verify_nonce( $np_nonce_el->item( 0 )->getAttribute( 'value' ), NanoPost_Email_Check_Admin::TEST_ALERT_ACTION ), 'the form carries a valid nonce' );
+
+// A valid request posts one test message to the saved URL.
+set_transient( NanoPost_Email_Check_Admin::SEND_LOCK, 1, MINUTE_IN_SECONDS );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::TEST_ALERT_ACTION ) );
+$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ), 'test alert: returns to the screen', $np_out );
+np_assert( count( $GLOBALS['np_requests'] ) === $np_n + 1, 'test alert: one request (the "Send test now" lock does not block it)' );
+$np_req  = end( $GLOBALS['np_requests'] );
+$np_body = json_decode( $np_req['args']['body'], true );
+np_assert( 'https://hooks.slack.com/services/T/B/x' === $np_req['url'], 'test alert: sent to the saved URL', $np_req['url'] );
+np_assert( ! empty( $np_req['args']['reject_unsafe_urls'] ), 'test alert: request is made with reject_unsafe_urls' );
+np_assert( array( 'text', 'site', 'status', 'error', 'time', 'test' ) === array_keys( $np_body ), 'test alert: the alert fields plus "test"', array_keys( $np_body ) );
+np_assert( true === $np_body['test'] && 'fail' === $np_body['status'] && home_url() === $np_body['site'], 'test alert: test is true, status fail, site is home URL', $np_body );
+np_assert( 0 === strpos( $np_body['text'], 'Test alert' ) && false !== strpos( $np_body['text'], 'No check failed' ), 'test alert: the text says it is a test', $np_body['text'] );
+np_assert( false !== strpos( $np_body['error'], 'Test alert' ), 'test alert: the error says it is a test', $np_body['error'] );
+np_assert( 'alert-sent' === get_transient( $np_alert_notice ), 'test alert: delivered notice is set' );
+$np_state = NanoPost_Email_Check_Webhook::state();
+np_assert( ! empty( $np_state['last_delivery']['ok'] ) && ! empty( $np_state['last_delivery']['test'] ), 'test alert: delivery recorded as a test', $np_state['last_delivery'] );
+np_assert( array( 'wp_mail' => 'fail' ) === $np_state['last_status'], 'test alert: the alert status is not changed', $np_state['last_status'] );
+np_assert( md5( 'https://hooks.slack.com/services/T/B/x' ) === $np_state['url_hash'], 'test alert: the URL hash is not changed' );
+$np_html = np_render_screen();
+np_assert( false !== strpos( $np_html, 'notice-success' ) && false !== strpos( $np_html, 'test alert was delivered' ), 'test alert: delivered notice is shown' );
+np_assert( false !== strpos( $np_html, 'Last webhook message (test alert):' ), 'test alert: the delivery status names the test' );
+
+// At most once a minute per site.
+$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) );
+np_assert( 0 === strpos( $np_out, 'redirect:' ), 'test alert: a second press returns to the screen', $np_out );
+np_assert( count( $GLOBALS['np_requests'] ) === $np_n + 1, 'test alert: a second press within one minute sends nothing' );
+np_assert( 'alert-wait' === get_transient( $np_alert_notice ), 'test alert: a second press shows the "wait" notice' );
+$np_html = np_render_screen();
+np_assert( false !== strpos( $np_html, 'notice-warning' ) && false !== strpos( $np_html, 'test alert was sent less than one minute ago' ), 'test alert: the "wait" notice is shown' );
+delete_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK );
+
+// A failed delivery is reported, and a real alert later replaces the test record.
+$GLOBALS['np_http_code'] = 500;
+np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) );
+$GLOBALS['np_http_code'] = 204;
+delete_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK );
+np_assert( 'alert-failed' === get_transient( $np_alert_notice ), 'test alert: failed notice is set' );
+$np_html = np_render_screen();
+np_assert( false !== strpos( $np_html, 'notice-error' ) && false !== strpos( $np_html, '500 Server Error' ), 'test alert: failed notice shows the HTTP status' );
+NanoPost_Email_Check_Webhook::on_result( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', true ) );
+np_assert( empty( NanoPost_Email_Check_Webhook::state()['last_delivery']['test'] ), 'a real alert after a test is not marked as a test' );
+
+// Google Chat gets only the text.
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'webhook_url' => 'https://chat.googleapis.com/v1/spaces/X/messages?key=k' ) );
+np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) );
+delete_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK );
+$np_body = json_decode( end( $GLOBALS['np_requests'] )['args']['body'], true );
+np_assert( array( 'text' ) === array_keys( $np_body ) && 0 === strpos( $np_body['text'], 'Test alert' ), 'test alert: Google Chat gets only the text', $np_body );
+
+wp_set_current_user( 0 );
+
+// ---------------------------------------------------------------------------------------
 if ( is_multisite() ) {
 	np_section( 'Multisite' );
 	np_reset();
@@ -888,6 +1018,7 @@ NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'manu
 update_option( NanoPost_Email_Check_Webhook::STATE_OPTION, array( 'last_status' => array() ) );
 np_schedule_state( time(), time() );
 set_transient( NanoPost_Email_Check_Admin::SEND_LOCK, 1, MINUTE_IN_SECONDS );
+set_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK, 1, MINUTE_IN_SECONDS );
 update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
 $np_second = 0;
@@ -914,6 +1045,7 @@ wp_cache_flush();
 $np_left = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->options WHERE option_name LIKE 'nanopost\\_email\\_check%'" );
 np_assert( 0 === $np_left, 'no options left', $np_left );
 np_assert( false === get_transient( NanoPost_Email_Check_Admin::SEND_LOCK ), 'no send lock left' );
+np_assert( false === get_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK ), 'no test alert lock left' );
 np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'no dismissed-notice user option left' );
 np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'no scheduled event left' );
 if ( $np_second ) {

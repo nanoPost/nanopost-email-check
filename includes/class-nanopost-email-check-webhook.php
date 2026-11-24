@@ -98,6 +98,56 @@ class NanoPost_Email_Check_Webhook {
 	}
 
 	/**
+	 * Post a sample alert, marked as a test, to the saved URL. The delivery is recorded,
+	 * marked as a test; the status per check is not changed, so a test neither starts an
+	 * alert nor ends one.
+	 *
+	 * @return array|null Delivery record, or null when no URL is saved.
+	 */
+	public static function send_test() {
+		$url = NanoPost_Email_Check_Settings::webhook_url();
+		if ( '' === $url ) {
+			return null;
+		}
+
+		$delivery         = self::send( $url, self::test_payload( $url ) );
+		$delivery['test'] = true;
+
+		$state                  = self::state();
+		$state['last_delivery'] = $delivery;
+		update_option( self::STATE_OPTION, $state, false );
+
+		return $delivery;
+	}
+
+	/**
+	 * Test message body: the fields of a failure alert, so receivers handle it the same
+	 * way, plus "test": true. The text and the error say that no check failed. The text
+	 * holds no error text from a check, so there is nothing in it to escape.
+	 *
+	 * @param string $url Webhook URL.
+	 * @return array
+	 */
+	public static function test_payload( $url ) {
+		$site = home_url();
+		/* translators: %s: site address. */
+		$text = sprintf( __( 'Test alert from Email Check on %s. This is only a test of the webhook. No check failed.', 'nanopost-email-check' ), $site );
+
+		if ( self::is_google_chat( $url ) ) {
+			return array( 'text' => $text );
+		}
+
+		return array(
+			'text'   => $text,
+			'site'   => $site,
+			'status' => 'fail',
+			'error'  => __( 'Test alert. No check failed.', 'nanopost-email-check' ),
+			'time'   => gmdate( 'c' ),
+			'test'   => true,
+		);
+	}
+
+	/**
 	 * Make error text safe for chat receivers. The "error" field keeps the raw text.
 	 *
 	 * - Escape &, < and > as Slack documents, so the text cannot add mentions such as
