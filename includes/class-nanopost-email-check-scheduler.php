@@ -22,15 +22,73 @@ class NanoPost_Email_Check_Scheduler {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		add_action( 'add_option_' . NanoPost_Email_Check_Settings::OPTION, array( __CLASS__, 'sync_schedule' ), 10, 0 );
 		add_action( 'update_option_' . NanoPost_Email_Check_Settings::OPTION, array( __CLASS__, 'sync_schedule' ), 10, 0 );
-		// Put the event back if something removed it, without the old "deactivate and reactivate" step.
-		add_action( 'admin_init', array( __CLASS__, 'ensure_scheduled' ) );
+		// Put the event back if it is missing: after a network activation, or if something
+		// removed it. On every request (front end, wp-admin, WP-CLI), so a site whose admin
+		// area no one opens is scheduled too. It reads the cron option, which is autoloaded.
+		add_action( 'wp_loaded', array( __CLASS__, 'ensure_scheduled' ) );
+		// After core has set up the new site's tables (priority 10).
+		add_action( 'wp_initialize_site', array( __CLASS__, 'initialize_site' ), 100 );
 	}
 
 	/**
-	 * Activation hook.
+	 * Activation hook. On a network activation, schedule the event on every site.
+	 *
+	 * @param bool $network_wide True when activated for the whole network.
 	 */
-	public static function activate() {
+	public static function activate( $network_wide = false ) {
+		if ( ! is_multisite() || ! $network_wide ) {
+			self::ensure_scheduled();
+			return;
+		}
+
+		foreach ( self::site_ids() as $site_id ) {
+			switch_to_blog( $site_id );
+			self::ensure_scheduled();
+			restore_current_blog();
+		}
+	}
+
+	/**
+	 * A new site on the network. Schedule it when the plugin is network-active.
+	 *
+	 * @param WP_Site $site New site.
+	 */
+	public static function initialize_site( $site ) {
+		if ( ! $site instanceof WP_Site || ! self::is_network_active() ) {
+			return;
+		}
+
+		switch_to_blog( (int) $site->blog_id );
 		self::ensure_scheduled();
+		restore_current_blog();
+	}
+
+	/**
+	 * Whether the plugin is active for the whole network. is_plugin_active_for_network() is
+	 * loaded only in wp-admin, so read the network option directly.
+	 *
+	 * @return bool
+	 */
+	private static function is_network_active() {
+		if ( ! is_multisite() ) {
+			return false;
+		}
+		$plugins = get_site_option( 'active_sitewide_plugins', array() );
+		return is_array( $plugins ) && isset( $plugins[ plugin_basename( NANOPOST_EMAIL_CHECK_FILE ) ] );
+	}
+
+	/**
+	 * IDs of all sites on the network.
+	 *
+	 * @return int[]
+	 */
+	private static function site_ids() {
+		return get_sites(
+			array(
+				'fields' => 'ids',
+				'number' => 0,
+			)
+		);
 	}
 
 	/**
@@ -44,12 +102,7 @@ class NanoPost_Email_Check_Scheduler {
 			return;
 		}
 
-		foreach ( get_sites(
-			array(
-				'fields' => 'ids',
-				'number' => 0,
-			)
-		) as $site_id ) {
+		foreach ( self::site_ids() as $site_id ) {
 			switch_to_blog( $site_id );
 			wp_clear_scheduled_hook( self::HOOK );
 			restore_current_blog();

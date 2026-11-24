@@ -878,14 +878,6 @@ if ( is_multisite() ) {
 	np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'a dismissal on one site does not reach another' );
 	restore_current_blog();
 
-	// Network activation: each site schedules on its first admin page load.
-	switch_to_blog( $np_site2 );
-	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
-	np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'second site starts without an event' );
-	do_action( 'admin_init' );
-	np_assert( false !== wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'admin_init schedules it on that site' );
-	restore_current_blog();
-
 	// Network deactivation clears every site.
 	NanoPost_Email_Check_Scheduler::ensure_scheduled();
 	NanoPost_Email_Check_Scheduler::deactivate( true );
@@ -1029,6 +1021,8 @@ np_assert( false === strpos( $np_help_q, 'secret' ) && false !== strpos( $np_hel
 np_assert( 'https://nanopo.st/email-check-plugin/?utm_source=wp-admin&utm_medium=email-check&utm_content=status#what-a-pass-means' === NanoPost_Email_Check_Help::pass( NanoPost_Email_Check_Help::PLACE_STATUS ), 'pass link keeps its anchor after the tags' );
 np_assert( 'https://nanopo.st/email-check-plugin/cron/?utm_source=wp-admin&utm_medium=email-check&utm_content=notice-stale' === NanoPost_Email_Check_Help::cron( NanoPost_Email_Check_Help::PLACE_NOTICE_STALE ), 'cron link from the stale notice' );
 np_assert( 'https://nanopo.st/email-check-plugin/?utm_source=wp-admin&utm_medium=email-check&utm_content=header' === NanoPost_Email_Check_Help::home( NanoPost_Email_Check_Help::PLACE_HEADER ), 'home link from the page title' );
+
+require __DIR__ . '/integration-multisite-schedule.php';
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );
