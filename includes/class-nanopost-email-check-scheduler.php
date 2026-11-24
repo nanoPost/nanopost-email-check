@@ -36,7 +36,8 @@ class NanoPost_Email_Check_Scheduler {
 	 * @param bool $network_wide True when activated for the whole network.
 	 */
 	public static function activate( $network_wide = false ) {
-		if ( ! is_multisite() || ! $network_wide ) {
+		// On a large network the loop could time out; wp_loaded schedules each site on its next request.
+		if ( ! is_multisite() || ! $network_wide || wp_is_large_network() ) {
 			self::ensure_scheduled();
 			return;
 		}

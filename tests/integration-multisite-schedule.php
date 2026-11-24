@@ -105,6 +105,21 @@ if ( ! is_multisite() ) {
 	}
 	np_assert( array() === $np_missing, 'network activation schedules every site (' . count( $np_sites ) . ')', $np_missing );
 
+	// On a large network, activation skips the loop; each site is scheduled on its next request.
+	np_reset();
+	switch_to_blog( $np_site2 );
+	np_reset();
+	restore_current_blog();
+	add_filter( 'wp_is_large_network', '__return_true' );
+	do_action( $np_activate, true );
+	remove_filter( 'wp_is_large_network', '__return_true' );
+	np_assert( false !== wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'large network: activation schedules the current site' );
+	switch_to_blog( $np_site2 );
+	np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'large network: activation skips the other sites' );
+	np_sched_wp_loaded();
+	np_assert( false !== wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'large network: a request to the other site schedules it' );
+	restore_current_blog();
+
 	// A site activation (not network-wide) schedules only the current site.
 	np_reset();
 	switch_to_blog( $np_site2 );
