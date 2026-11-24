@@ -1,0 +1,42 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"meta": {
+		"title": "nanoPost Email Check demo",
+		"description": "The plugin screen with sample results: a week of passes and a failed check with an SMTP error. All data is fake.",
+		"author": "nanoPost",
+		"categories": [
+			"Email"
+		]
+	},
+	"landingPage": "/wp-admin/tools.php?page=nanopost-email-check",
+	"preferredVersions": {
+		"php": "8.3",
+		"wp": "latest"
+	},
+	"steps": [
+		{
+			"step": "login"
+		},
+		{
+			"step": "setSiteOptions",
+			"options": {
+				"blogname": "Example Shop",
+				"admin_email": "owner@example.com"
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "nanopost-email-check"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php\n// Demo state for the Live Preview. Fake data only. Same story as screenshots/scenes.php \"failed\".\nrequire_once '/wordpress/wp-load.php';\n\nupdate_user_meta( 1, 'show_welcome_panel', 0 );\n\n$to = 'alerts@example.com';\nremove_all_filters( 'sanitize_option_' . NanoPost_Email_Check_Settings::OPTION );\nupdate_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => $to, 'interval' => 'daily', 'webhook_url' => '' ) );\n\n$now  = time();\n$day  = DAY_IN_SECONDS;\n$hour = HOUR_IN_SECONDS;\n$last = $now - 3 * $hour;\n$err  = 'SMTP Error: Could not authenticate.';\n\n// Oldest first: a week of passes, a failure, a failed manual retry, the fix, passes, then a new failure.\n$rows = array();\nfor ( $d = 10; $d >= 4; $d-- ) {\n\t$rows[] = array( 'scheduled', true, '', $last - $d * $day );\n}\n$rows[] = array( 'scheduled', false, $err, $last - 3 * $day );\n$rows[] = array( 'manual', false, $err, $last - 3 * $day + 2 * $hour + 42 * MINUTE_IN_SECONDS );\n$rows[] = array( 'manual', true, '', $last - 3 * $day + 2 * $hour + 58 * MINUTE_IN_SECONDS );\nfor ( $d = 2; $d >= 0; $d-- ) {\n\t$rows[] = array( 'scheduled', true, '', $last - $d * $day );\n}\n$rows[] = array( 'scheduled', false, $err, $now - 20 * MINUTE_IN_SECONDS );\n\ndelete_option( NanoPost_Email_Check_Log::OPTION );\nforeach ( $rows as $row ) {\n\tNanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', $row[0], $row[1], $row[2], $to, $row[3] ) );\n}\n\nwp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );\nwp_schedule_event( $now - 20 * MINUTE_IN_SECONDS + $day, 'daily', NanoPost_Email_Check_Scheduler::HOOK );\nupdate_option(\n\tNanoPost_Email_Check_Scheduler::STATE_OPTION,\n\tarray(\n\t\t'since'          => $last - 11 * $day,\n\t\t'last_completed' => $now - 20 * MINUTE_IN_SECONDS,\n\t)\n);\n"
+		}
+	]
+}

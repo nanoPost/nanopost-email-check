@@ -56,3 +56,20 @@ Captions in `readme.txt` under `== Screenshots ==` must match the `wporg-N` entr
 
 Times in the scenes are relative to the moment of the run, so "x ago" texts stay the same,
 but dates change from day to day. Use fake data only: this repo is public.
+
+## Live Preview blueprint
+
+`.wordpress-org/blueprints/blueprint.json` is the WordPress Playground blueprint for the
+"Live Preview" button on WordPress.org (SVN `assets/blueprints/blueprint.json`). It installs
+the plugin from WordPress.org, logs in, and lands on Tools > Email Check with fake results:
+the same story as the `failed` scene in `scenes.php`. Keep the two in step.
+
+Test it locally (any free port except 8888):
+
+```sh
+npx @wp-playground/cli@3.1.63 server --port=9412 --blueprint=.wordpress-org/blueprints/blueprint.json
+```
+
+The blueprint is published by the "Update WordPress.org listing" workflow or by a release.
+The button shows only to committers until the preview is set to public in the plugin's
+Advanced view on WordPress.org.
