@@ -65,6 +65,14 @@ class NanoPost_Email_Check_Result {
 	public $time;
 
 	/**
+	 * How the test email was sent, from NanoPost_Email_Check_Mailer::normalize(). Type ''
+	 * when not known, for example in results logged before version 1.3.0.
+	 *
+	 * @var array
+	 */
+	public $mailer;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string   $check     Check id.
@@ -73,14 +81,16 @@ class NanoPost_Email_Check_Result {
 	 * @param string   $error     Error text.
 	 * @param string   $recipient Recipient address.
 	 * @param int|null $time      Unix time. Default: now.
+	 * @param array    $mailer    Mailer info. Default: not known.
 	 */
-	public function __construct( $check, $trigger, $passed, $error = '', $recipient = '', $time = null ) {
+	public function __construct( $check, $trigger, $passed, $error = '', $recipient = '', $time = null, $mailer = array() ) {
 		$this->check     = (string) $check;
 		$this->trigger   = (string) $trigger;
 		$this->passed    = (bool) $passed;
 		$this->error     = self::cut( (string) $error );
 		$this->recipient = (string) $recipient;
 		$this->time      = null === $time ? time() : (int) $time;
+		$this->mailer    = NanoPost_Email_Check_Mailer::normalize( $mailer );
 	}
 
 	/**
@@ -118,6 +128,7 @@ class NanoPost_Email_Check_Result {
 			'error'     => $this->error,
 			'recipient' => $this->recipient,
 			'time'      => $this->time,
+			'mailer'    => $this->mailer,
 		);
 	}
 
@@ -137,9 +148,10 @@ class NanoPost_Email_Check_Result {
 				'error'     => '',
 				'recipient' => '',
 				'time'      => 0,
+				'mailer'    => array(),
 			)
 		);
 
-		return new self( $data['check'], $data['trigger'], $data['passed'], $data['error'], $data['recipient'], $data['time'] );
+		return new self( $data['check'], $data['trigger'], $data['passed'], $data['error'], $data['recipient'], $data['time'], $data['mailer'] );
 	}
 }

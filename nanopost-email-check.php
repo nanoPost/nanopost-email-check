@@ -23,6 +23,7 @@ define( 'NANOPOST_EMAIL_CHECK_DIR', plugin_dir_path( __FILE__ ) );
 
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/interface-nanopost-email-check-check.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-result.php';
+require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-mailer.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-settings.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-log.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-mail-check.php';

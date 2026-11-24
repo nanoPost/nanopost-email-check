@@ -59,11 +59,42 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 			}
 		};
 
+		$watch = new NanoPost_Email_Check_Mailer();
+		$watch->start();
 		add_action( 'wp_mail_failed', $catch );
-		$sent = wp_mail( $recipient, $this->subject( $trigger ), $this->message( $trigger, $time ) );
+		$sent = (bool) wp_mail( $recipient, $this->subject( $trigger ), $this->message( $trigger, $time ) );
 		remove_action( 'wp_mail_failed', $catch );
+		$watch->stop();
 
-		return new NanoPost_Email_Check_Result( $this->id(), $trigger, (bool) $sent, $sent ? '' : $error, $recipient, $time );
+		$mailer = $watch->info();
+		if ( ! $sent ) {
+			$error = self::add_cause( $error, $watch->failure_cause( $mailer ) );
+		}
+
+		return new NanoPost_Email_Check_Result( $this->id(), $trigger, $sent, $sent ? '' : $error, $recipient, $time, $mailer );
+	}
+
+	/**
+	 * Add a cause in brackets after the error text. The error text is cut, not the cause,
+	 * so the whole stays within NanoPost_Email_Check_Result::MAX_ERROR_LENGTH.
+	 *
+	 * @param string $error Error text.
+	 * @param string $cause Cause. Nothing is added when empty.
+	 * @return string
+	 */
+	public static function add_cause( $error, $cause ) {
+		if ( '' === $cause ) {
+			return $error;
+		}
+		$suffix = '(' . $cause . ')';
+		if ( '' === $error ) {
+			return $suffix;
+		}
+		$suffix = ' ' . $suffix;
+		$length = function_exists( 'mb_strlen' ) ? mb_strlen( $suffix ) : strlen( $suffix );
+		$room   = max( 0, NanoPost_Email_Check_Result::MAX_ERROR_LENGTH - $length );
+		$error  = function_exists( 'mb_substr' ) ? mb_substr( $error, 0, $room ) : substr( $error, 0, $room );
+		return $error . $suffix;
 	}
 
 	/**

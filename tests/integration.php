@@ -1023,6 +1023,7 @@ np_assert( 'https://nanopo.st/email-check-plugin/cron/?utm_source=wp-admin&utm_m
 np_assert( 'https://nanopo.st/email-check-plugin/?utm_source=wp-admin&utm_medium=email-check&utm_content=header' === NanoPost_Email_Check_Help::home( NanoPost_Email_Check_Help::PLACE_HEADER ), 'home link from the page title' );
 
 require __DIR__ . '/integration-multisite-schedule.php';
+require __DIR__ . '/integration-diagnostics.php';
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );
