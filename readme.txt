@@ -59,6 +59,8 @@ Free. No paid version.
 
 Full documentation: [nanopo.st/email-check-plugin](https://nanopo.st/email-check-plugin/). Source code: [GitHub](https://github.com/nanoPost/nanopost-email-check).
 
+Writing about the plugin? The [reviewer's guide](https://nanopo.st/email-check-plugin/reviewers/) has the facts, a test-site walkthrough and a press kit.
+
 == Installation ==
 
 1. Install the plugin from **Plugins > Add Plugin** (**Add New Plugin** in older WordPress versions) and activate it, or upload the `nanopost-email-check` folder to `/wp-content/plugins/`.

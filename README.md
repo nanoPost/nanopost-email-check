@@ -5,6 +5,7 @@ a schedule, logs each result, and warns you in wp-admin when a check fails or wh
 stop running. An optional webhook sends failures to Slack, Google Chat or any other receiver.
 
 - Documentation: https://nanopo.st/email-check-plugin/
+- Reviewer's guide (facts, test-site walkthrough, press kit): https://nanopo.st/email-check-plugin/reviewers/
 - License: GPLv2 or later
 
 `readme.txt` is the full description used by WordPress.org.
