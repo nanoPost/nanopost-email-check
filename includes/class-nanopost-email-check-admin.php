@@ -21,6 +21,8 @@ class NanoPost_Email_Check_Admin {
 	const TEST_ALERT_LOCK   = 'nanopost_email_check_test_alert_lock';
 	const TEST_ALERT_FORM   = 'nanopost-email-check-test-alert';
 
+	const REVIEW_URL = 'https://wordpress.org/support/plugin/nanopost-email-check/reviews/#new-post';
+
 	/**
 	 * Register hooks.
 	 */
@@ -288,6 +290,10 @@ class NanoPost_Email_Check_Admin {
 		echo '<div id="nanopost-email-check-log">';
 		self::render_log();
 		echo '</div>';
+
+		echo '<p id="nanopost-email-check-rate" class="description" style="margin-top:2em;">';
+		echo self::help_link( self::REVIEW_URL, __( 'Rate this plugin on WordPress.org', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+		echo '</p>';
 
 		echo '</div>';
 	}

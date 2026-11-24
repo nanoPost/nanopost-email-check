@@ -839,6 +839,15 @@ delete_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK );
 $np_body = json_decode( end( $GLOBALS['np_requests'] )['args']['body'], true );
 np_assert( array( 'text' ) === array_keys( $np_body ) && 0 === strpos( $np_body['text'], 'Test alert' ), 'test alert: Google Chat gets only the text', $np_body );
 
+// Rating link: one quiet line on the plugin screen, no notice.
+$np_x    = np_xpath( np_render_screen() );
+$np_rate = $np_x->query( '//p[@id="nanopost-email-check-rate"]//a[@href="https://wordpress.org/support/plugin/nanopost-email-check/reviews/#new-post"]' );
+np_assert( 1 === $np_rate->length, 'rating link on the plugin screen' );
+np_assert( 1 === $np_rate->length && '_blank' === $np_rate->item( 0 )->getAttribute( 'target' ) && false !== strpos( $np_rate->item( 0 )->getAttribute( 'rel' ), 'noopener' ), 'rating link opens in a new tab with noopener' );
+np_assert( 0 === $np_x->query( '//*[contains(@class, "notice")]//a[contains(@href, "/reviews/")]' )->length, 'rating link is not in a notice' );
+ob_start();
+NanoPost_Email_Check_Alerts::render();
+np_assert( false === strpos( ob_get_clean(), '/reviews/' ), 'no rating link in the admin notices' );
 wp_set_current_user( 0 );
 
 // ---------------------------------------------------------------------------------------
