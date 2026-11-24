@@ -57,14 +57,21 @@ class NanoPost_Email_Check_Scheduler {
 	}
 
 	/**
-	 * Schedule the event if it is missing. The first run is one interval from now.
+	 * Schedule the event if it is missing, or schedule it again when its recurrence differs
+	 * from the effective interval (for example after a constant changed). The first run is
+	 * one interval from now. When the event matches, this only reads the cron array.
 	 */
 	public static function ensure_scheduled() {
-		if ( wp_next_scheduled( self::HOOK ) ) {
+		$interval = NanoPost_Email_Check_Settings::interval();
+		$event    = wp_get_scheduled_event( self::HOOK );
+
+		if ( $event && $interval === $event->schedule ) {
 			return;
 		}
+		if ( $event ) {
+			wp_clear_scheduled_hook( self::HOOK );
+		}
 
-		$interval = NanoPost_Email_Check_Settings::interval();
 		if ( wp_schedule_event( time() + self::interval_seconds( $interval ), $interval, self::HOOK ) ) {
 			// Start of the grace period before the first scheduled check is due.
 			self::update_state( 'since', time() );
@@ -72,7 +79,7 @@ class NanoPost_Email_Check_Scheduler {
 	}
 
 	/**
-	 * Clear and schedule again, for example after the interval changed.
+	 * Clear and schedule again.
 	 */
 	public static function reschedule() {
 		wp_clear_scheduled_hook( self::HOOK );
@@ -81,16 +88,10 @@ class NanoPost_Email_Check_Scheduler {
 
 	/**
 	 * After the settings are saved: reschedule only when the event's schedule differs from
-	 * the chosen interval, so saving other settings does not move the next run.
+	 * the effective interval, so saving other settings does not move the next run.
 	 */
 	public static function sync_schedule() {
-		$event = wp_get_scheduled_event( self::HOOK );
-
-		if ( ! $event ) {
-			self::ensure_scheduled();
-		} elseif ( NanoPost_Email_Check_Settings::interval() !== $event->schedule ) {
-			self::reschedule();
-		}
+		self::ensure_scheduled();
 	}
 
 	/**
@@ -101,6 +102,9 @@ class NanoPost_Email_Check_Scheduler {
 		// Only reached when the checks finished. WP-Cron has already booked the next run,
 		// so a crash here leaves a future event but no new time.
 		self::update_state( 'last_completed', time() );
+		// Follow an interval set in code that changed since the event was booked, also on
+		// sites where nobody opens the admin area.
+		self::ensure_scheduled();
 	}
 
 	/**
