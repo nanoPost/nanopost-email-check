@@ -33,6 +33,11 @@ require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-ale
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-webhook.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-admin.php';
 
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-cli.php';
+	require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-cli-settings.php';
+}
+
 register_activation_hook( __FILE__, array( 'NanoPost_Email_Check_Scheduler', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'NanoPost_Email_Check_Scheduler', 'deactivate' ) );
 

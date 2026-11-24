@@ -24,6 +24,10 @@ class NanoPost_Email_Check_Plugin {
 			NanoPost_Email_Check_Admin::init();
 			NanoPost_Email_Check_Alerts::init();
 		}
+
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			NanoPost_Email_Check_CLI::register();
+		}
 	}
 
 	/**
@@ -54,7 +58,7 @@ class NanoPost_Email_Check_Plugin {
 	/**
 	 * Run every check once, log each result and announce it.
 	 *
-	 * @param string $trigger NanoPost_Email_Check_Result::TRIGGER_SCHEDULED or TRIGGER_MANUAL.
+	 * @param string $trigger NanoPost_Email_Check_Result::TRIGGER_SCHEDULED, TRIGGER_MANUAL or TRIGGER_CLI.
 	 * @return NanoPost_Email_Check_Result[]
 	 */
 	public static function run_checks( $trigger ) {

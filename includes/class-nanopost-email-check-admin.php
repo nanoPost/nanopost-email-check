@@ -447,7 +447,7 @@ class NanoPost_Email_Check_Admin {
 			echo '<tr>';
 			echo '<td>' . esc_html( self::format_time( $result->time ) ) . '</td>';
 			echo '<td>' . wp_kses_post( self::status_badge( $result->passed ) ) . '</td>';
-			echo '<td>' . esc_html( NanoPost_Email_Check_Result::TRIGGER_MANUAL === $result->trigger ? __( 'Manual', 'nanopost-email-check' ) : __( 'Schedule', 'nanopost-email-check' ) ) . '</td>';
+			echo '<td>' . esc_html( $result->trigger_label() ) . '</td>';
 			echo '<td>' . esc_html( $result->recipient ) . '</td>';
 			echo '<td>';
 			if ( $result->passed ) {
@@ -509,7 +509,7 @@ class NanoPost_Email_Check_Admin {
 	 * @param int $time Unix time.
 	 * @return string
 	 */
-	private static function format_time( $time ) {
+	public static function format_time( $time ) {
 		$date = self::format_date( $time );
 		$diff = human_time_diff( $time, time() );
 

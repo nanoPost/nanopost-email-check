@@ -75,11 +75,32 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 	private function subject( $trigger ) {
 		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 
-		return NanoPost_Email_Check_Result::TRIGGER_MANUAL === $trigger
+		if ( NanoPost_Email_Check_Result::TRIGGER_MANUAL === $trigger ) {
 			/* translators: %s: site name. */
-			? sprintf( __( '[%s] Email check: manual test', 'nanopost-email-check' ), $site )
+			return sprintf( __( '[%s] Email check: manual test', 'nanopost-email-check' ), $site );
+		}
+		if ( NanoPost_Email_Check_Result::TRIGGER_CLI === $trigger ) {
 			/* translators: %s: site name. */
-			: sprintf( __( '[%s] Email check: scheduled test', 'nanopost-email-check' ), $site );
+			return sprintf( __( '[%s] Email check: WP-CLI test', 'nanopost-email-check' ), $site );
+		}
+		/* translators: %s: site name. */
+		return sprintf( __( '[%s] Email check: scheduled test', 'nanopost-email-check' ), $site );
+	}
+
+	/**
+	 * The "Started by" line of the email body.
+	 *
+	 * @param string $trigger Trigger.
+	 * @return string
+	 */
+	private function started_by( $trigger ) {
+		if ( NanoPost_Email_Check_Result::TRIGGER_MANUAL === $trigger ) {
+			return __( 'Started by: a user on the plugin screen', 'nanopost-email-check' );
+		}
+		if ( NanoPost_Email_Check_Result::TRIGGER_CLI === $trigger ) {
+			return __( 'Started by: WP-CLI', 'nanopost-email-check' );
+		}
+		return __( 'Started by: the schedule', 'nanopost-email-check' );
 	}
 
 	/**
@@ -98,9 +119,7 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 			'',
 			/* translators: %s: date and time. */
 			sprintf( __( 'Sent: %s', 'nanopost-email-check' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $time ) ),
-			NanoPost_Email_Check_Result::TRIGGER_MANUAL === $trigger
-				? __( 'Started by: a user on the plugin screen', 'nanopost-email-check' )
-				: __( 'Started by: the schedule', 'nanopost-email-check' ),
+			$this->started_by( $trigger ),
 			'',
 			/* translators: %s: URL of the plugin screen. */
 			sprintf( __( 'Settings and results: %s', 'nanopost-email-check' ), NanoPost_Email_Check_Admin::page_url() ),

@@ -14,6 +14,7 @@ class NanoPost_Email_Check_Result {
 
 	const TRIGGER_SCHEDULED = 'scheduled';
 	const TRIGGER_MANUAL    = 'manual';
+	const TRIGGER_CLI       = 'cli';
 
 	/**
 	 * Error text is cut at this many characters. It is stored in the log, shown on admin
@@ -29,7 +30,7 @@ class NanoPost_Email_Check_Result {
 	public $check;
 
 	/**
-	 * What started the run: scheduled or manual.
+	 * What started the run: scheduled, manual (the plugin screen) or cli (WP-CLI).
 	 *
 	 * @var string
 	 */
@@ -103,6 +104,21 @@ class NanoPost_Email_Check_Result {
 			return $this->error;
 		}
 		return __( 'wp_mail() returned false and gave no error message.', 'nanopost-email-check' );
+	}
+
+	/**
+	 * Name of what started the run, for the log.
+	 *
+	 * @return string
+	 */
+	public function trigger_label() {
+		if ( self::TRIGGER_MANUAL === $this->trigger ) {
+			return __( 'Manual', 'nanopost-email-check' );
+		}
+		if ( self::TRIGGER_CLI === $this->trigger ) {
+			return __( 'WP-CLI', 'nanopost-email-check' );
+		}
+		return __( 'Schedule', 'nanopost-email-check' );
 	}
 
 	/**

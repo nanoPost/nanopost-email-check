@@ -32,7 +32,7 @@ interface NanoPost_Email_Check_Check {
 	/**
 	 * Run the check once.
 	 *
-	 * @param string $trigger NanoPost_Email_Check_Result::TRIGGER_SCHEDULED or TRIGGER_MANUAL.
+	 * @param string $trigger NanoPost_Email_Check_Result::TRIGGER_SCHEDULED, TRIGGER_MANUAL or TRIGGER_CLI.
 	 * @return NanoPost_Email_Check_Result
 	 */
 	public function run( $trigger );
