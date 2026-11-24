@@ -1,6 +1,6 @@
 === nanoPost Email Check ===
 Contributors: nanopost
-Tags: email, wp_mail, smtp, email test, email log
+Tags: email, test email, wp_mail, email monitoring, smtp
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -8,7 +8,7 @@ Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Check that your site can still send email. Sends a scheduled test email, logs each result and warns you in wp-admin when a check fails.
+Email not sending? Find out the day it breaks. Sends a scheduled test email, logs each result and warns you in wp-admin when a check fails.
 
 == Description ==
 
@@ -33,6 +33,8 @@ A pass means the mail system WordPress uses accepted the message. It does not pr
 * **Help links** for failed and stopped checks, to plain-language help pages on nanopo.st, including an error decoder.
 
 The plugin screen is at **Tools > Email Check**.
+
+Free. No paid version.
 
 Full documentation: [nanopo.st/email-check-plugin](https://nanopo.st/email-check-plugin/). Source code: [GitHub](https://github.com/nanoPost/nanopost-email-check).
 
