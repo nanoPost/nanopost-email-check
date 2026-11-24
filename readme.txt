@@ -61,7 +61,7 @@ Full documentation: [nanopo.st/email-check-plugin](https://nanopo.st/email-check
 
 == Installation ==
 
-1. Install the plugin from **Plugins > Add New** and activate it, or upload the `nanopost-email-check` folder to `/wp-content/plugins/`.
+1. Install the plugin from **Plugins > Add Plugin** (**Add New Plugin** in older WordPress versions) and activate it, or upload the `nanopost-email-check` folder to `/wp-content/plugins/`.
 2. Go to **Tools > Email Check**.
 3. Enter the address that should receive the test emails, or leave it empty to use the site's Administration Email Address. Use a mailbox someone reads, at a different provider from the site if you can.
 4. Choose how often to check, and save.
