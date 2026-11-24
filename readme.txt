@@ -8,19 +8,19 @@ Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Email not sending? Find out the day it breaks. Sends a scheduled test email, logs each result and warns you in wp-admin when a check fails.
+Email not sending? Run scheduled email tests, log each result and get admin notices when a check fails or scheduled checks stop running.
 
 == Description ==
 
-A site can lose its email without any sign on the front end. A host switches off PHP's `mail()`, an SMTP password changes, an API key is revoked, a plugin update resets the mailer settings. The pages still load. The first report is usually a customer asking where their order confirmation went.
+WordPress can stop sending email while the rest of your site keeps working. A host might disable PHP's `mail()` function, an SMTP password might change, or a plugin update might reset your mail settings. You may only notice when a customer reports a missing order confirmation.
 
-nanoPost Email Check sends a test email on a schedule, logs every result, and puts a notice in wp-admin when a check fails or when the checks stop running. It finds the break on the day it happens.
+nanoPost Email Check sends a test email on a schedule and logs each result. It shows a notice in wp-admin when a check fails or the scheduled checks stop running.
 
 = What to expect =
 
 1. **Set up on one screen.** Choose the mailbox for the test emails and how often to check, then press **Send test now** to see a first result.
 2. **Then there is nothing to do.** A short test email arrives on schedule, daily by default. The plugin keeps a log of every result.
-3. **When sending breaks,** a notice in wp-admin shows the error and links to a plain-language explanation. With a webhook set, a message also goes to Slack, Google Chat, Discord or another chat app, so the alert does not depend on the email that just broke.
+3. **When sending breaks,** a notice in wp-admin shows the error and links to an explanation of it. With a webhook set, a message also goes to Slack, Google Chat, Discord or another chat app, so the alert does not depend on the email that just broke.
 4. **When it is fixed,** the next passing check clears the notice, and the webhook sends one message to say email works again.
 5. **If the checks themselves stop,** for example because WP-Cron is not running, a separate notice tells you.
 
@@ -37,20 +37,20 @@ SMTP and email log plugins send and record the site's real mail, and some of the
 = Features =
 
 * **Scheduled test email:** twice daily, daily (the default) or weekly.
-* **Send test now:** check at once, for example right after you change the mail settings.
-* **Result log:** the last 30 results, with the time, what started the check, pass or fail, the recipient and the error text.
+* **Send test now:** send a test email immediately from the plugin screen, for example right after you change the mail settings.
+* **Result log:** the last 30 results, with the time, whether the check was scheduled or manual, pass or fail, the recipient and the error text.
 * **Notice when a check fails,** for administrators, with the error and a link that explains it. It clears by itself when the next check passes. Each user can dismiss it, and a new failure shows it again.
 * **Notice when the checks stop:** if no scheduled check has finished for twice the interval. The usual causes are WP-Cron not running, or a check that crashes with a PHP error.
-* **Optional chat alerts:** a webhook to Slack, Google Chat, Discord or any service that accepts one, and one more message when checks pass again.
-* **Plain-language help** for failed and stopped checks, on nanopo.st, including an error decoder.
+* **Optional chat alerts:** post failures to Slack, Google Chat, Discord or any service that accepts a webhook, so you can receive alerts even when WordPress cannot send email. It also sends a recovery message when a check passes after a failure.
+* **Troubleshooting help:** links from failed or stopped checks to help pages on nanopo.st, including an error decoder.
 * **Multisite:** each site runs its own checks, with its own settings, log and notices.
 * **No outside requests** unless you set a webhook. Nothing is sent to nanoPost.
 
 = What a pass means =
 
-Each check sends a short test message with `wp_mail()`, the function WordPress and well-behaved plugins use to send email. The plugin records whether `wp_mail()` accepted the message. When it did not, it also records the error text WordPress reported through the `wp_mail_failed` hook, for example `SMTP Error: Could not authenticate.`
+Each check sends a short test message through `wp_mail()`, WordPress's email function. The plugin records whether the call succeeded. If it fails, the log includes any error text reported through `wp_mail_failed`, such as `SMTP Error: Could not authenticate.`
 
-A pass means the mail system WordPress uses accepted the message. It does not prove the message reached an inbox: read the test email in the recipient mailbox to confirm that.
+A successful check does not confirm delivery. Check the recipient mailbox to make sure the test message arrived.
 
 The plugin screen is at **Tools > Email Check**.
 
@@ -92,7 +92,7 @@ Yes. Enter a webhook URL on the plugin screen. Slack and Google Chat incoming we
 
 = Does it work on multisite? =
 
-Yes. Each site runs its own checks, with its own settings, log and notices. When the plugin is network-activated, each site schedules its checks the first time a request loads that site's admin side, usually when someone opens its dashboard. On a network where all sites use the same mail setup, activating the plugin on the main site is enough: network activation then sends one test email per site, which repeats the same check.
+Yes. Each site runs its own checks, with its own settings, log and notices. After network activation, each site schedules its checks when its admin area is first accessed. On a network where all sites use the same mail setup, activating the plugin on the main site is enough: network activation then sends one test email per site, which repeats the same check.
 
 = What happens to the data when I delete the plugin? =
 
