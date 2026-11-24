@@ -372,6 +372,11 @@ class NanoPost_Email_Check_Admin {
 		}
 		echo '</td></tr>';
 
+		$mailer = null === $latest ? '' : NanoPost_Email_Check_Mailer::describe( $latest->mailer );
+		if ( '' !== $mailer ) {
+			echo '<tr><th scope="row">' . esc_html__( 'Mailer', 'nanopost-email-check' ) . '</th><td>' . esc_html( $mailer ) . '</td></tr>';
+		}
+
 		echo '<tr><th scope="row">' . esc_html__( 'Scheduled checks', 'nanopost-email-check' ) . '</th><td>';
 		if ( null !== $stale ) {
 			echo '<strong style="color:#d63638;">' . esc_html__( 'Stopped', 'nanopost-email-check' ) . '</strong> &middot; ';
@@ -446,7 +451,12 @@ class NanoPost_Email_Check_Admin {
 		foreach ( $results as $result ) {
 			echo '<tr>';
 			echo '<td>' . esc_html( self::format_time( $result->time ) ) . '</td>';
-			echo '<td>' . wp_kses_post( self::status_badge( $result->passed ) ) . '</td>';
+			echo '<td>' . wp_kses_post( self::status_badge( $result->passed ) );
+			$mailer = NanoPost_Email_Check_Mailer::short_label( $result->mailer );
+			if ( '' !== $mailer ) {
+				echo '<br /><span class="description" style="overflow-wrap:anywhere;">' . esc_html( $mailer ) . '</span>';
+			}
+			echo '</td>';
 			echo '<td>' . esc_html( NanoPost_Email_Check_Result::TRIGGER_MANUAL === $result->trigger ? __( 'Manual', 'nanopost-email-check' ) : __( 'Schedule', 'nanopost-email-check' ) ) . '</td>';
 			echo '<td>' . esc_html( $result->recipient ) . '</td>';
 			echo '<td>';
