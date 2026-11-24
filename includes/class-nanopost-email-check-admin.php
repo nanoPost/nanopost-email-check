@@ -499,12 +499,16 @@ class NanoPost_Email_Check_Admin {
 		echo '<th scope="col">' . esc_html__( 'Error', 'nanopost-email-check' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
-		foreach ( $results as $result ) {
+		$results = array_values( $results );
+		foreach ( $results as $index => $result ) {
 			echo '<tr>';
 			echo '<td>' . esc_html( self::format_time( $result->time ) ) . '</td>';
 			echo '<td>' . wp_kses_post( self::status_badge( $result->passed ) );
+			// The mailer only where it helps: on a failure, and where it changed from the
+			// older row below. The Status section always shows the current one.
 			$mailer = NanoPost_Email_Check_Mailer::short_label( $result->mailer );
-			if ( '' !== $mailer ) {
+			$older  = isset( $results[ $index + 1 ] ) ? NanoPost_Email_Check_Mailer::short_label( $results[ $index + 1 ]->mailer ) : null;
+			if ( '' !== $mailer && ( ! $result->passed || $mailer !== $older ) ) {
 				echo '<br /><span class="description" style="overflow-wrap:anywhere;">' . esc_html( $mailer ) . '</span>';
 			}
 			echo '</td>';

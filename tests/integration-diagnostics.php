@@ -278,6 +278,23 @@ np_assert( 'Sends through SMTP smtp.example.com:587' === trim( (string) $np_x->e
 $np_cells = $np_x->query( '//div[@id="nanopost-email-check-log"]//tbody/tr/td[2]/span' );
 np_assert( 2 === $np_cells->length && 'SMTP smtp.example.com:587' === $np_cells->item( 0 )->textContent && 'PHP mail()' === $np_cells->item( 1 )->textContent, 'screen: the log shows each mailer under the result' );
 
+// A repeated mailer is shown once, on the oldest row of the run, and on every failure.
+$np_smtp = array(
+	'type' => 'smtp',
+	'host' => 'smtp.example.com',
+	'port' => 587,
+);
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', false, 'SMTP Error: x', 'a@example.com', time() - 30, $np_smtp ) );
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', true, '', 'a@example.com', time() - 20, $np_smtp ) );
+NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', 'scheduled', true, '', 'a@example.com', time() - 10, $np_smtp ) );
+$np_x    = np_xpath( np_render_screen() );
+$np_rows = $np_x->query( '//div[@id="nanopost-email-check-log"]//tbody/tr' );
+$np_seen = array();
+foreach ( $np_rows as $np_row ) {
+	$np_seen[] = $np_x->query( './td[2]/span', $np_row )->length;
+}
+np_assert( array( 0, 0, 1, 1, 1 ) === $np_seen, 'screen: the log repeats a mailer only on failures and changes', $np_seen );
+
 $np_evil = 'Evil "q" & <b>bold</b><img src=x onerror=alert(1)><script>alert(1)</script>';
 NanoPost_Email_Check_Log::add(
 	new NanoPost_Email_Check_Result(
