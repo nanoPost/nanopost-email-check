@@ -16,21 +16,41 @@ A site can lose its email without any sign on the front end. A host switches off
 
 nanoPost Email Check sends a test email on a schedule, logs every result, and puts a notice in wp-admin when a check fails or when the checks stop running. It finds the break on the day it happens.
 
-= What it checks =
+= What to expect =
+
+1. **Set up in about two minutes.** Choose the mailbox for the test emails and how often to check, then press **Send test now** to see a first result.
+2. **Then there is nothing to do.** A short test email arrives on schedule, daily by default. The plugin keeps a log of every result.
+3. **When sending breaks,** a notice in wp-admin shows the error and links to a plain-language explanation. With a webhook set, a message also goes to Slack, Google Chat, Discord or another chat app, so the alert does not depend on the email that just broke.
+4. **When it is fixed,** the next passing check clears the notice, and the webhook sends one message to say email works again.
+5. **If the checks themselves stop,** for example because WP-Cron is not running, a separate notice tells you.
+
+= Who it is for =
+
+* **Site owners** who want to hear about a mail problem before a customer does.
+* **Shops and lead-form sites,** where a lost order confirmation or enquiry is lost business.
+* **Agencies and maintainers,** who want a message in the team chat when a client site stops sending.
+
+= How it differs from SMTP and email log plugins =
+
+SMTP and email log plugins send and record the site's real mail, and some of them alert on a failure. All of that depends on the site sending something. Email Check sends its own test on a schedule, so it finds a break on a quiet day too, and it tells you when the checks themselves have stopped. It works with any SMTP plugin. It does not replace one.
+
+= Features =
+
+* **Scheduled test email:** twice daily, daily (the default) or weekly.
+* **Send test now:** check at once, for example right after you change the mail settings.
+* **Result log:** the last 30 results, with the time, what started the check, pass or fail, the recipient and the error text.
+* **Notice when a check fails,** for administrators, with the error and a link that explains it. It clears by itself when the next check passes. Each user can dismiss it, and a new failure shows it again.
+* **Notice when the checks stop:** if no scheduled check has finished for twice the interval. The usual causes are WP-Cron not running, or a check that crashes with a PHP error.
+* **Optional chat alerts:** a webhook to Slack, Google Chat, Discord or any service that accepts one, and one more message when checks pass again.
+* **Plain-language help** for failed and stopped checks, on nanopo.st, including an error decoder.
+* **Multisite:** each site runs its own checks, with its own settings, log and notices.
+* **No outside requests** unless you set a webhook. Nothing is sent to nanoPost.
+
+= What a pass means =
 
 Each check sends a short test message with `wp_mail()`, the function WordPress and well-behaved plugins use to send email. The plugin records whether `wp_mail()` accepted the message. When it did not, it also records the error text WordPress reported through the `wp_mail_failed` hook, for example `SMTP Error: Could not authenticate.`
 
 A pass means the mail system WordPress uses accepted the message. It does not prove the message reached an inbox: read the test email in the recipient mailbox to confirm that.
-
-= Features =
-
-* **Scheduled checks:** twice daily, daily (the default) or weekly, on WP-Cron.
-* **Send test now:** run a check at once from the plugin screen.
-* **Result log:** the last 30 results, with the time, what started the check, pass or fail, the recipient and the error text.
-* **Admin notice when a check fails**, for users who can manage options. It clears by itself when the next check passes, and each user can dismiss it. A new failure shows it again.
-* **Admin notice when the checks stop:** if no scheduled check has finished for twice the interval, the plugin tells you. The usual causes are WP-Cron not running, or a check that crashes with a PHP error.
-* **Optional webhook:** post failures to Slack, Google Chat, Discord or any service that accepts a webhook, so the alert does not depend on the email that just broke. One more message is sent when checks pass again.
-* **Help links** for failed and stopped checks, to plain-language help pages on nanopo.st, including an error decoder.
 
 The plugin screen is at **Tools > Email Check**.
 
