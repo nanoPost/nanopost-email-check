@@ -23,7 +23,7 @@ class NanoPost_Email_Check_Help {
 
 	/**
 	 * Places a link can come from, sent as utm_content: the page title, the Status
-	 * section, the settings form, the result log and the two admin notices.
+	 * section, the settings form, the result log, the two admin notices and WP-CLI.
 	 */
 	const PLACE_HEADER        = 'header';
 	const PLACE_STATUS        = 'status';
@@ -31,6 +31,7 @@ class NanoPost_Email_Check_Help {
 	const PLACE_LOG           = 'log';
 	const PLACE_NOTICE_FAILED = 'notice-failed';
 	const PLACE_NOTICE_STALE  = 'notice-stale';
+	const PLACE_CLI           = 'cli';
 
 	/**
 	 * Plugin home page.

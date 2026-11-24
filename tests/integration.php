@@ -1024,6 +1024,7 @@ np_assert( 'https://nanopo.st/email-check-plugin/?utm_source=wp-admin&utm_medium
 
 require __DIR__ . '/integration-multisite-schedule.php';
 require __DIR__ . '/integration-diagnostics.php';
+require __DIR__ . '/integration-cli.php';
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );
