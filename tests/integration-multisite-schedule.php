@@ -41,7 +41,10 @@ function np_sched_cli_logger() {
 // ---------------------------------------------------------------------------------------
 np_section( 'Schedule outside wp-admin' );
 np_reset();
-np_assert( ! is_admin(), 'the run is outside wp-admin (WP-CLI)' );
+// Earlier sections set a wp-admin screen. Leave it for this section.
+$np_screen = isset( $GLOBALS['current_screen'] ) ? $GLOBALS['current_screen'] : null;
+unset( $GLOBALS['current_screen'] );
+np_assert( ! is_admin(), 'the request is outside wp-admin' );
 np_assert( false !== has_action( 'wp_loaded', array( 'NanoPost_Email_Check_Scheduler', 'ensure_scheduled' ) ), 'the event is checked on every request (wp_loaded), not only in wp-admin' );
 np_assert( false === has_action( 'admin_init', array( 'NanoPost_Email_Check_Scheduler', 'ensure_scheduled' ) ), 'no second check on admin_init' );
 np_sched_wp_loaded();
@@ -50,6 +53,7 @@ np_assert( NanoPost_Email_Check_Scheduler::scheduled_since() > 0, 'the grace per
 $np_before = wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK );
 np_sched_wp_loaded();
 np_assert( wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ) === $np_before, 'a later request keeps the next run' );
+$GLOBALS['current_screen'] = $np_screen; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Put the screen back.
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Activation hook' );
