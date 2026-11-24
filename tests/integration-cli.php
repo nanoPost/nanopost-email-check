@@ -61,6 +61,8 @@ foreach ( array( 'email-check', 'email-check run', 'email-check status', 'email-
 		WP_CLI::log( '        wp ' . $np_path . ( '' !== (string) $np_command->get_synopsis() ? ' ' . $np_command->get_synopsis() : '' ) . ' -- ' . $np_command->get_shortdesc() );
 	}
 }
+$np_command = np_cli_command( 'email-check test-alert' );
+np_assert( $np_command && 'Post a test alert to the saved webhook URL.' === $np_command->get_shortdesc(), 'the short description is one whole sentence', $np_command ? $np_command->get_shortdesc() : null );
 $np_command = np_cli_command( 'email-check status' );
 np_assert( $np_command && '[--format=<format>]' === $np_command->get_synopsis(), 'status takes --format', $np_command ? $np_command->get_synopsis() : null );
 $np_command = np_cli_command( 'email-check settings set' );

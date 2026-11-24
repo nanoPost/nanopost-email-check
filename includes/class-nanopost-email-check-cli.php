@@ -153,8 +153,9 @@ class NanoPost_Email_Check_CLI {
 	}
 
 	/**
-	 * Post a test alert to the saved webhook URL, like "Send test alert" on the plugin
-	 * screen. There is no once-a-minute limit.
+	 * Post a test alert to the saved webhook URL.
+	 *
+	 * Works like "Send test alert" on the plugin screen, without the once-a-minute limit.
 	 *
 	 * The message says that it is a test, and its JSON has "test": true. It does not change
 	 * the alert state, so it neither starts nor ends an alert.
