@@ -113,7 +113,7 @@ Yes, with WP-CLI. The `wp email-check` command has these subcommands:
 * `wp email-check status`: show whether the checks run and pass. Add `--format=json` for scripts. Exits with 0 when all is well, 1 when the last check failed, 2 when scheduled checks have stopped or are not scheduled, and 3 when no check has run yet.
 * `wp email-check test-alert`: send a test alert to the saved webhook URL. Exits with 0 when the receiver accepted it, and 1 otherwise.
 
-`run` and `test-alert` have no once-a-minute limit. On multisite, choose the site with `--url`. For details, run `wp help email-check`.
+`run` and `test-alert` have no once-a-minute limit. On multisite, choose the site with `--url`. For details, run `wp help email-check`, or read [settings in code and WP-CLI](https://nanopo.st/email-check-plugin/code-and-cli/).
 
 = Does it work on multisite? =
 
