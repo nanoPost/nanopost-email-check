@@ -1,7 +1,7 @@
 <?php
 /**
  * Integration tests: scheduling after a network activation, on new sites and outside
- * wp-admin. Included from integration.php.
+ * wp-admin, and the WP-CLI warning for a refused setting. Included from integration.php.
  *
  * @package NanoPost_Email_Check
  */
@@ -20,6 +20,22 @@ function np_sched_wp_loaded() {
 	if ( false !== has_action( 'wp_loaded', $np_callback ) ) {
 		call_user_func( $np_callback );
 	}
+}
+
+/**
+ * The current WP-CLI logger.
+ *
+ * @return object|null
+ */
+function np_sched_cli_logger() {
+	if ( method_exists( 'WP_CLI', 'get_logger' ) ) {
+		return WP_CLI::get_logger();
+	}
+	$np_property = new ReflectionProperty( 'WP_CLI', 'logger' );
+	if ( PHP_VERSION_ID < 80100 ) {
+		$np_property->setAccessible( true );
+	}
+	return $np_property->getValue();
 }
 
 // ---------------------------------------------------------------------------------------
@@ -142,3 +158,46 @@ if ( ! is_multisite() ) {
 	restore_current_blog();
 	np_reset();
 }
+
+// ---------------------------------------------------------------------------------------
+np_section( 'WP-CLI: a refused setting prints a warning' );
+np_reset();
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'kept@example.com' ) );
+
+$np_cli_before  = np_sched_cli_logger();
+$np_cli_capture = new class() {
+	/**
+	 * Warnings received.
+	 *
+	 * @var string[]
+	 */
+	public $warnings = array();
+
+	/**
+	 * Record a warning.
+	 *
+	 * @param string $message Message.
+	 */
+	public function warning( $message ) {
+		$this->warnings[] = (string) $message;
+	}
+
+	/**
+	 * Other log levels are ignored while capturing.
+	 *
+	 * @param string $name Method.
+	 * @param array  $args Arguments.
+	 */
+	public function __call( $name, $args ) {}
+};
+WP_CLI::set_logger( $np_cli_capture );
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'not-an-email' ) );
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'valid@example.com' ) );
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'webhook_url' => 'http://127.0.0.1/x' ) );
+WP_CLI::set_logger( $np_cli_before );
+
+np_assert( 'valid@example.com' === NanoPost_Email_Check_Settings::recipient(), 'the valid address is saved' );
+np_assert( 2 === count( $np_cli_capture->warnings ), 'one warning for each refused value, none for the valid one', $np_cli_capture->warnings );
+np_assert( isset( $np_cli_capture->warnings[0] ) && false !== strpos( $np_cli_capture->warnings[0], 'The email address is not valid' ), 'the warning says the address was refused', $np_cli_capture->warnings );
+np_assert( isset( $np_cli_capture->warnings[1] ) && false !== strpos( $np_cli_capture->warnings[1], 'The webhook URL is not valid' ), 'the warning says the webhook URL was refused', $np_cli_capture->warnings );
+np_reset();

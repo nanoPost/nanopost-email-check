@@ -157,7 +157,8 @@ class NanoPost_Email_Check_Settings {
 
 	/**
 	 * Show a settings error on the plugin screen. The function exists only in wp-admin; the
-	 * option can also be saved from elsewhere, for example WP-CLI.
+	 * option can also be saved from elsewhere. In WP-CLI, also print a warning, so a person or
+	 * a script sees that part of the change was refused (the command still succeeds).
 	 *
 	 * @param string $code    Error code.
 	 * @param string $message Message.
@@ -165,6 +166,9 @@ class NanoPost_Email_Check_Settings {
 	private static function error( $code, $message ) {
 		if ( function_exists( 'add_settings_error' ) ) {
 			add_settings_error( self::OPTION, $code, $message );
+		}
+		if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI' ) ) {
+			WP_CLI::warning( $message );
 		}
 	}
 }
