@@ -4,7 +4,7 @@ Tags: email, test email, wp_mail, email monitoring, smtp
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.3.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -166,6 +166,9 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.3.2 =
+* WP-CLI: `wp help email-check status` lists the `not-checked` state and exit code 3.
 
 = 1.3.1 =
 * WP-CLI: `wp email-check status` reports `not-checked` and exits with 3 when no check has run yet, so a script can tell it from a passing check.

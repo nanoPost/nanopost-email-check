@@ -109,12 +109,13 @@ class NanoPost_Email_Check_CLI {
 	 * * ok: the last check passed and scheduled checks run on time.
 	 * * failing: the last check failed.
 	 * * stopped: no scheduled check has finished for more than twice the interval.
-	 * * not-scheduled: there is no scheduled event. Loading any wp-admin page schedules it again.
+	 * * not-scheduled: there is no scheduled event. The next request to the site schedules it again.
+	 * * not-checked: the checks are scheduled, but no check has run yet.
 	 *
 	 * When checks have stopped or are not scheduled, that state is shown even if the last
 	 * check failed, because the last result may be old.
 	 *
-	 * Exits with 0 for ok, 1 for failing, and 2 for stopped or not-scheduled.
+	 * Exits with 0 for ok, 1 for failing, 2 for stopped or not-scheduled, and 3 for not-checked (no check has run yet).
 	 *
 	 * ## OPTIONS
 	 *
@@ -131,7 +132,7 @@ class NanoPost_Email_Check_CLI {
 	 *
 	 *     $ wp email-check status
 	 *
-	 *     # In a monitoring script: 0 ok, 1 failing, 2 stopped or not scheduled.
+	 *     # In a monitoring script: 0 ok, 1 failing, 2 stopped or not scheduled, 3 no check yet.
 	 *     $ wp email-check status --format=json
 	 *
 	 * @param array $args       Positional arguments.
@@ -265,7 +266,7 @@ class NanoPost_Email_Check_CLI {
 	}
 
 	/**
-	 * Exit code for a state: 0 ok, 1 failing, 2 stopped or not scheduled.
+	 * Exit code for a state: 0 ok, 1 failing, 2 stopped or not scheduled, 3 not checked yet.
 	 *
 	 * @param string $state A STATE_ constant.
 	 * @return int
