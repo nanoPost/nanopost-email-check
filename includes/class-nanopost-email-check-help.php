@@ -11,10 +11,6 @@ defined( 'ABSPATH' ) || exit;
  * URLs of the help pages. Plain links: the plugin never requests these pages itself.
  *
  * These URLs are fixed. The pages on nanopo.st keep them stable for released versions.
- *
- * Each link carries campaign tags (utm_source, utm_medium, utm_content) that name the
- * plugin screen it is on, so the site can count visits that come from the plugin. The
- * tags hold nothing about the site or its email. Error text stays after the "#".
  */
 class NanoPost_Email_Check_Help {
 
