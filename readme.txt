@@ -38,12 +38,13 @@ SMTP and email log plugins send and record the site's real mail, and some of the
 
 * **Scheduled test email:** twice daily, daily (the default) or weekly.
 * **Send test now:** send a test email immediately from the plugin screen, for example right after you change the mail settings.
-* **Result log:** the last 30 results, with the time, whether the check was scheduled or manual, pass or fail, the recipient and the error text.
+* **Result log:** the last 30 results, with the time, what started the check (the schedule, a user or WP-CLI), pass or fail, the recipient and the error text.
 * **Notice when a check fails,** for administrators, with the error and a link that explains it. It clears by itself when the next check passes. Each user can dismiss it, and a new failure shows it again.
 * **Notice when the checks stop:** if no scheduled check has finished for twice the interval. The usual causes are WP-Cron not running, or a check that crashes with a PHP error.
 * **Optional chat alerts:** post failures to Slack, Google Chat, Discord or any service that accepts a webhook, so you can receive alerts even when WordPress cannot send email. It also sends a recovery message when a check passes after a failure.
 * **Send test alert:** check the webhook without waiting for a real failure.
 * **Troubleshooting help:** links from failed or stopped checks to help pages on nanopo.st, including an error decoder.
+* **WP-CLI:** `wp email-check` changes the settings, runs a check, shows the status and sends a test alert, with exit codes for scripts.
 * **Multisite:** each site runs its own checks, with its own settings, log and notices.
 * **No outside requests** unless you set a webhook. Nothing is sent to nanoPost.
 
@@ -91,6 +92,17 @@ No scheduled check has finished for twice the interval. Usually WP-Cron is not r
 
 Yes. Enter a webhook URL on the plugin screen. Slack and Google Chat incoming webhooks work directly. For Discord, add `/slack` to the end of the webhook URL. Automation services can pass the message on to SMS, Microsoft Teams or other tools.
 
+= Can I set it up from the command line? =
+
+Yes, with WP-CLI. The `wp email-check` command has these subcommands:
+
+* `wp email-check settings get` and `wp email-check settings set <key> <value>`: show or change a setting. The keys are `recipient`, `interval` (`twicedaily`, `daily` or `weekly`) and `webhook_url`. A value is checked with the same rules as the plugin screen. An invalid value changes nothing and exits with 1.
+* `wp email-check run`: send a test email now. The log shows "WP-CLI" as what started it. Exits with 0 when the check passed and 1 when it failed.
+* `wp email-check status`: show whether the checks run and pass. Add `--format=json` for scripts. Exits with 0 when all is well, 1 when the last check failed, and 2 when scheduled checks have stopped or are not scheduled.
+* `wp email-check test-alert`: send a test alert to the saved webhook URL. Exits with 0 when the receiver accepted it, and 1 otherwise.
+
+`run` and `test-alert` have no once-a-minute limit. On multisite, choose the site with `--url`. For details, run `wp help email-check`.
+
 = Does it work on multisite? =
 
 Yes. Each site runs its own checks, with its own settings, log and notices. After network activation, each site schedules its checks when its admin area is first accessed. On a network where all sites use the same mail setup, activating the plugin on the main site is enough: network activation then sends one test email per site, which repeats the same check.
@@ -107,7 +119,7 @@ The plugin makes no outside requests unless you set a webhook URL.
 
 When you enter a webhook URL, the plugin sends an HTTP POST to that URL when a check fails, and once when checks pass again after a failure. The JSON body holds a short text line, the site address, the status (fail or pass), the error text and the time of the check. For a Google Chat URL, only the text line is sent. The request goes only to the URL you enter, and it is governed by the terms and privacy policy of the service that URL belongs to. Leave the field empty to send nothing.
 
-The "Send test alert" button on the plugin screen sends one test message to the saved URL, only when you click it. Its text says that it is a test and that no check failed. It has the same fields as a failure message, plus `"test": true`, so a receiver can handle it like a real alert or skip it. Real alerts do not have the `test` field. For a Google Chat URL, only the text line is sent. Example:
+The "Send test alert" button on the plugin screen, or `wp email-check test-alert`, sends one test message to the saved URL, only when you use it. Its text says that it is a test and that no check failed. It has the same fields as a failure message, plus `"test": true`, so a receiver can handle it like a real alert or skip it. Real alerts do not have the `test` field. For a Google Chat URL, only the text line is sent. Example:
 
 `{"text": "Test alert from Email Check on https://example.com. This is only a test of the webhook. No check failed.", "site": "https://example.com", "status": "fail", "error": "Test alert. No check failed.", "time": "2026-11-24T09:30:00+00:00", "test": true}`
 
