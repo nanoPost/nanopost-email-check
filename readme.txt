@@ -118,7 +118,7 @@ The setup help names these services. The plugin sends to them only when you ente
 
 = Help pages on nanopo.st =
 
-The plugin screen and notices link to help pages on nanopo.st. These are plain links: nothing is sent until you click one. When you click the help link for an error, the error text is put in the link after the `#`. Your browser does not send that part of the address to the server; the nanopo.st page reads it in your browser.
+The plugin screen and notices link to help pages on nanopo.st. These are plain links: nothing is sent until you click one. Each link carries campaign tags (`utm_source`, `utm_medium`, `utm_content`) that name the plugin screen or notice it is on, so nanopo.st can count visits from the plugin. They hold nothing about your site or its email. When you click the help link for an error, the error text is put in the link after the `#`. Your browser does not send that part of the address to the server; the nanopo.st page reads it in your browser.
 
 * Terms of use: https://nanopo.st/terms/
 * Privacy policy: https://nanopo.st/privacy/
@@ -135,6 +135,7 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 = 1.2.0 =
 * Send test alert: a button under the webhook URL posts a test message to the saved URL, at most once a minute per site. The message says that it is a test, and its JSON has `"test": true`. The webhook status shows when the last message was a test.
 * A link to rate the plugin on WordPress.org, at the bottom of the plugin screen.
+* Help links to nanopo.st carry campaign tags that name the screen or notice they are on. The error text stays after the `#` and is not sent to the server.
 
 = 1.1.0 =
 * Send test now runs at most once a minute per site.

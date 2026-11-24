@@ -180,7 +180,7 @@ class NanoPost_Email_Check_Alerts {
 		self::render_links(
 			$key,
 			array(
-				NanoPost_Email_Check_Help::for_failure( $result ) => __( 'What this error means', 'nanopost-email-check' ),
+				NanoPost_Email_Check_Help::for_failure( $result, NanoPost_Email_Check_Help::PLACE_NOTICE_FAILED ) => __( 'What this error means', 'nanopost-email-check' ),
 			)
 		);
 		echo '</div>';
@@ -210,7 +210,7 @@ class NanoPost_Email_Check_Alerts {
 		self::render_links(
 			$key,
 			array(
-				NanoPost_Email_Check_Help::cron() => __( 'How to fix WP-Cron', 'nanopost-email-check' ),
+				NanoPost_Email_Check_Help::cron( NanoPost_Email_Check_Help::PLACE_NOTICE_STALE ) => __( 'How to fix WP-Cron', 'nanopost-email-check' ),
 			)
 		);
 		echo '</div>';

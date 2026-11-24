@@ -116,7 +116,7 @@ class NanoPost_Email_Check_Admin {
 		);
 		echo '<p class="description">';
 		esc_html_e( 'Optional. When a check fails, the plugin posts a short JSON message to this URL, and once more when checks pass again. Works with Slack, Google Chat, Discord (Slack-compatible URL) and automation services. Leave empty for no outside requests.', 'nanopost-email-check' );
-		echo ' ' . self::help_link( NanoPost_Email_Check_Help::webhook(), __( 'How to set up a webhook', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+		echo ' ' . self::help_link( NanoPost_Email_Check_Help::webhook( NanoPost_Email_Check_Help::PLACE_SETTINGS ), __( 'How to set up a webhook', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 		echo '</p>';
 
 		// The button belongs to a separate form after the settings form (forms cannot be
@@ -258,7 +258,7 @@ class NanoPost_Email_Check_Admin {
 
 		echo '<div class="wrap">';
 		echo '<h1 class="wp-heading-inline">' . esc_html__( 'nanoPost Email Check', 'nanopost-email-check' ) . '</h1> ';
-		echo self::help_link( NanoPost_Email_Check_Help::home(), __( 'Help', 'nanopost-email-check' ), 'page-title-action' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+		echo self::help_link( NanoPost_Email_Check_Help::home( NanoPost_Email_Check_Help::PLACE_HEADER ), __( 'Help', 'nanopost-email-check' ), 'page-title-action' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 		echo '<hr class="wp-header-end">';
 
 		// Screens outside the Settings menu must print these themselves. No argument, so the
@@ -364,10 +364,10 @@ class NanoPost_Email_Check_Admin {
 				esc_html( self::format_time( $latest->time ) )
 			);
 			if ( $latest->passed ) {
-				echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::pass(), __( 'What a pass means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+				echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::pass( NanoPost_Email_Check_Help::PLACE_STATUS ), __( 'What a pass means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 			} else {
 				echo '<br /><code>' . esc_html( $latest->error_message() ) . '</code> &middot; ';
-				echo self::help_link( NanoPost_Email_Check_Help::for_failure( $latest ), __( 'What this error means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+				echo self::help_link( NanoPost_Email_Check_Help::for_failure( $latest, NanoPost_Email_Check_Help::PLACE_STATUS ), __( 'What this error means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 			}
 		}
 		echo '</td></tr>';
@@ -385,7 +385,7 @@ class NanoPost_Email_Check_Admin {
 			if ( NanoPost_Email_Check_Alerts::wp_cron_disabled() ) {
 				echo '<br />' . esc_html__( 'DISABLE_WP_CRON is set in wp-config.php, so a cron job on the server must run wp-cron.php.', 'nanopost-email-check' );
 			}
-			echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::cron(), __( 'How to fix WP-Cron', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::cron( NanoPost_Email_Check_Help::PLACE_STATUS ), __( 'How to fix WP-Cron', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 		} elseif ( $next ) {
 			echo esc_html(
 				sprintf(
@@ -454,7 +454,7 @@ class NanoPost_Email_Check_Admin {
 				echo '&mdash;';
 			} else {
 				echo '<code>' . esc_html( $result->error_message() ) . '</code> ';
-				echo self::help_link( NanoPost_Email_Check_Help::for_failure( $result ), __( 'What this means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+				echo self::help_link( NanoPost_Email_Check_Help::for_failure( $result, NanoPost_Email_Check_Help::PLACE_LOG ), __( 'What this means', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 			}
 			echo '</td>';
 			echo '</tr>';

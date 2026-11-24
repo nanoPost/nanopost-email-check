@@ -304,7 +304,7 @@ if ( $np_mailpit_up ) {
 	$np_results = NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_MANUAL );
 	np_assert( ! $np_results[0]->passed, 'check fails when SMTP is down' );
 	np_assert( false !== stripos( $np_results[0]->error, 'connect' ), 'error text comes from wp_mail_failed', $np_results[0]->error );
-	np_assert( 0 === strpos( NanoPost_Email_Check_Help::for_failure( $np_results[0] ), 'https://nanopo.st/email-check-plugin/error/#error=' ), 'failure with text links to the decoder' );
+	np_assert( 0 === strpos( NanoPost_Email_Check_Help::for_failure( $np_results[0] ), 'https://nanopo.st/email-check-plugin/error/?utm_source=wp-admin&utm_medium=email-check#error=' ), 'failure with text links to the decoder' );
 
 	remove_all_actions( 'phpmailer_init' );
 }
@@ -1017,8 +1017,18 @@ np_assert( '@allowed and @heres' === NanoPost_Email_Check_Webhook::escape_markup
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Help links' );
-np_assert( 'https://nanopo.st/email-check-plugin/error/#error=SMTP%20Error%3A%20x%26y' === NanoPost_Email_Check_Help::error( 'SMTP Error: x&y' ), 'error text is rawurlencoded after #' );
-np_assert( strlen( rawurldecode( substr( NanoPost_Email_Check_Help::error( str_repeat( 'a', 5000 ) ), strlen( 'https://nanopo.st/email-check-plugin/error/#error=' ) ) ) ) === 4000, 'error text is cut at 4,000 characters' );
+np_assert( 'https://nanopo.st/email-check-plugin/error/?utm_source=wp-admin&utm_medium=email-check#error=SMTP%20Error%3A%20x%26y' === NanoPost_Email_Check_Help::error( 'SMTP Error: x&y' ), 'error text is rawurlencoded after #' );
+np_assert( strlen( rawurldecode( substr( NanoPost_Email_Check_Help::error( str_repeat( 'a', 5000 ) ), strlen( 'https://nanopo.st/email-check-plugin/error/?utm_source=wp-admin&utm_medium=email-check#error=' ) ) ) ) === 4000, 'error text is cut at 4,000 characters' );
+
+// Help links carry campaign tags before the fragment; the error text stays in the fragment.
+$np_help_url = NanoPost_Email_Check_Help::error( 'SMTP Error: secret-ish text', NanoPost_Email_Check_Help::PLACE_NOTICE_FAILED );
+$np_help_q   = (string) wp_parse_url( $np_help_url, PHP_URL_QUERY );
+$np_help_f   = (string) wp_parse_url( $np_help_url, PHP_URL_FRAGMENT );
+np_assert( 'utm_source=wp-admin&utm_medium=email-check&utm_content=notice-failed' === $np_help_q, 'help link query holds only the campaign tags' );
+np_assert( false === strpos( $np_help_q, 'secret' ) && false !== strpos( $np_help_f, 'secret' ), 'error text is in the fragment, not the query' );
+np_assert( 'https://nanopo.st/email-check-plugin/?utm_source=wp-admin&utm_medium=email-check&utm_content=status#what-a-pass-means' === NanoPost_Email_Check_Help::pass( NanoPost_Email_Check_Help::PLACE_STATUS ), 'pass link keeps its anchor after the tags' );
+np_assert( 'https://nanopo.st/email-check-plugin/cron/?utm_source=wp-admin&utm_medium=email-check&utm_content=notice-stale' === NanoPost_Email_Check_Help::cron( NanoPost_Email_Check_Help::PLACE_NOTICE_STALE ), 'cron link from the stale notice' );
+np_assert( 'https://nanopo.st/email-check-plugin/?utm_source=wp-admin&utm_medium=email-check&utm_content=header' === NanoPost_Email_Check_Help::home( NanoPost_Email_Check_Help::PLACE_HEADER ), 'home link from the page title' );
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );
