@@ -46,7 +46,7 @@ SMTP and email log plugins send and record the site's real mail, and some of the
 * **Troubleshooting help:** links from failed or stopped checks to help pages on nanopo.st, including an error decoder.
 * **WP-CLI:** `wp email-check` changes the settings, runs a check, shows the status and sends a test alert, with exit codes for scripts.
 * **Settings in code:** set the recipient, interval and webhook URL in `wp-config.php`. The plugin screen shows them read-only.
-* **Mailer shown:** each result records how the site sends: SMTP server and port, PHP `mail()`, or another plugin. When PHP `mail()` fails because the sendmail program is missing, the error says so.
+* **Mailer shown:** each result records how the site sends: SMTP server and port, PHP `mail()`, or another plugin, and which plugin set it up. When PHP `mail()` fails because the sendmail program is missing, the error says so.
 * **Multisite:** each site runs its own checks, with its own settings, log and notices.
 * **No outside requests** unless you set a webhook. Nothing is sent to nanoPost.
 
@@ -166,6 +166,9 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.4.0 =
+* Mailer: Status, the log and `wp email-check status` name the plugin that set up the mailer, for example "Sends through SMTP smtp.example.com:587, set up by WP Mail SMTP". The plugin is named only when all other `phpmailer_init` callbacks belong to one plugin.
 
 = 1.3.3 =
 * Mailer: a plugin that sends through its own PHPMailer class (for example by an API) is shown as handling the sending, not as PHP `mail()`, and gets no sendmail hint.

@@ -71,6 +71,13 @@ class NanoPost_Email_Check_Mailer {
 	private $override_file = '';
 
 	/**
+	 * Name of the one plugin whose callbacks set up PHPMailer, or ''.
+	 *
+	 * @var string
+	 */
+	private $set_up_by = '';
+
+	/**
 	 * PHPMailer's Sendmail path. Used for the sendmail check only; not stored.
 	 *
 	 * @var string
@@ -121,6 +128,39 @@ class NanoPost_Email_Check_Mailer {
 		$this->sendmail = isset( $phpmailer->Sendmail ) ? (string) $phpmailer->Sendmail : '';
 		// phpcs:enable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		$this->override_file = self::sending_override_file( $phpmailer );
+		$this->set_up_by     = self::phpmailer_init_plugin( array( $this, 'on_phpmailer_init' ) );
+	}
+
+	/**
+	 * The plugin that set up PHPMailer: the one plugin that all other phpmailer_init
+	 * callbacks belong to. Empty when there are none, when they belong to several plugins,
+	 * or when one is in WordPress, a theme or a file outside a single plugin: then the
+	 * plugin cannot tell which callback set the mailer.
+	 *
+	 * @param callable $own This class's own callback, which is not counted.
+	 * @return string
+	 */
+	private static function phpmailer_init_plugin( $own ) {
+		global $wp_filter;
+		if ( ! isset( $wp_filter['phpmailer_init'] ) || ! is_object( $wp_filter['phpmailer_init'] ) ) {
+			return '';
+		}
+
+		$names = array();
+		foreach ( (array) $wp_filter['phpmailer_init']->callbacks as $callbacks ) {
+			foreach ( (array) $callbacks as $callback ) {
+				if ( ! isset( $callback['function'] ) || $own === $callback['function'] ) {
+					continue;
+				}
+				$name = self::plugin_name( self::callback_file( $callback['function'] ) );
+				if ( '' === $name ) {
+					return '';
+				}
+				$names[ $name ] = true;
+			}
+		}
+
+		return 1 === count( $names ) ? (string) key( $names ) : '';
 	}
 
 	/**
@@ -184,17 +224,24 @@ class NanoPost_Email_Check_Mailer {
 						'type' => self::TYPE_SMTP,
 						'host' => $this->seen['host'],
 						'port' => $this->seen['port'],
+						'by'   => $this->set_up_by,
 					)
 				);
 			}
 			if ( in_array( $mailer, array( self::TYPE_MAIL, self::TYPE_SENDMAIL, self::TYPE_QMAIL ), true ) ) {
-				return self::normalize( array( 'type' => $mailer ) );
+				return self::normalize(
+					array(
+						'type' => $mailer,
+						'by'   => $this->set_up_by,
+					)
+				);
 			}
 			if ( '' !== $mailer ) {
 				return self::normalize(
 					array(
 						'type' => self::TYPE_OTHER,
 						'name' => $this->seen['mailer'],
+						'by'   => $this->set_up_by,
 					)
 				);
 			}
@@ -282,7 +329,8 @@ class NanoPost_Email_Check_Mailer {
 	 *
 	 * Keys: type ('smtp', 'mail', 'sendmail', 'qmail', 'other', 'plugin' or '' when not
 	 * known), host and port (smtp), name (the Mailer value for 'other', the plugin name
-	 * for 'plugin', or ''), via ('pre_wp_mail', 'wp_mail' or 'phpmailer', for 'plugin').
+	 * for 'plugin', or ''), via ('pre_wp_mail', 'wp_mail' or 'phpmailer', for 'plugin'), by (the one plugin that set
+	 * up PHPMailer, for the other known types, or '').
 	 *
 	 * @param mixed $data Mailer info.
 	 * @return array
@@ -297,6 +345,7 @@ class NanoPost_Email_Check_Mailer {
 			'port' => 0,
 			'name' => '',
 			'via'  => '',
+			'by'   => '',
 		);
 
 		if ( self::TYPE_SMTP === $type ) {
@@ -306,6 +355,9 @@ class NanoPost_Email_Check_Mailer {
 		}
 		if ( self::TYPE_OTHER === $type || self::TYPE_PLUGIN === $type ) {
 			$info['name'] = self::text( isset( $data['name'] ) ? $data['name'] : '' );
+		}
+		if ( '' !== $type && self::TYPE_PLUGIN !== $type ) {
+			$info['by'] = self::text( isset( $data['by'] ) ? $data['by'] : '' );
 		}
 		if ( self::TYPE_PLUGIN === $type ) {
 			$via         = isset( $data['via'] ) ? $data['via'] : '';
@@ -324,7 +376,21 @@ class NanoPost_Email_Check_Mailer {
 	 */
 	public static function describe( $info ) {
 		$info = self::normalize( $info );
+		$text = self::describe_how( $info );
 
+		return '' === $text || '' === $info['by']
+			? $text
+			/* translators: 1: how mail is sent, such as "Sends through SMTP smtp.example.com:587", 2: plugin name. */
+			: sprintf( __( '%1$s, set up by %2$s', 'nanopost-email-check' ), $text, $info['by'] );
+	}
+
+	/**
+	 * How mail is sent, without the plugin that set it up.
+	 *
+	 * @param array $info Normalized mailer info.
+	 * @return string
+	 */
+	private static function describe_how( $info ) {
 		switch ( $info['type'] ) {
 			case self::TYPE_SMTP:
 				return '' === $info['host']
@@ -371,7 +437,18 @@ class NanoPost_Email_Check_Mailer {
 	 */
 	public static function short_label( $info ) {
 		$info = self::normalize( $info );
+		$text = self::short_how( $info );
 
+		return '' === $text || '' === $info['by'] ? $text : $text . ' (' . $info['by'] . ')';
+	}
+
+	/**
+	 * Short form of how mail is sent, without the plugin that set it up.
+	 *
+	 * @param array $info Normalized mailer info.
+	 * @return string
+	 */
+	private static function short_how( $info ) {
 		switch ( $info['type'] ) {
 			case self::TYPE_SMTP:
 				return trim( 'SMTP ' . self::server( $info ) );

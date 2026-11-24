@@ -65,13 +65,7 @@ if ( null !== np_mailpit( 'GET', 'info' ) ) {
 	$np = np_diag_run();
 	np_assert( $np->passed, 'SMTP: check passes through Mailpit', $np->to_array() );
 	np_assert(
-		array(
-			'type' => 'smtp',
-			'host' => 'mailpit',
-			'port' => 1025,
-			'name' => '',
-			'via'  => '',
-		) === $np->mailer,
+		'smtp' === $np->mailer['type'] && 'mailpit' === $np->mailer['host'] && 1025 === $np->mailer['port'] && '' === $np->mailer['name'] && '' === $np->mailer['via'],
 		'SMTP: the final host and port are recorded',
 		$np->mailer
 	);
@@ -109,8 +103,10 @@ np_assert(
 	$np->error
 );
 np_assert( false !== strpos( NanoPost_Email_Check_Help::for_failure( $np ), rawurlencode( '/nonexistent/np-sendmail not found)' ) ), 'mail(): the decoder link carries the cause after #' );
-np_assert( 'Sends through PHP mail()' === NanoPost_Email_Check_Mailer::describe( $np->mailer ), 'mail(): status text' );
-np_assert( 'PHP mail()' === NanoPost_Email_Check_Mailer::short_label( $np->mailer ), 'mail(): log text' );
+// np_diag_no_send() hooks phpmailer_init from this plugin's folder, so it is named.
+np_assert( 'Sends through PHP mail(), set up by nanoPost Email Check' === NanoPost_Email_Check_Mailer::describe( $np->mailer ), 'mail(): status text', NanoPost_Email_Check_Mailer::describe( $np->mailer ) );
+np_assert( 'PHP mail() (nanoPost Email Check)' === NanoPost_Email_Check_Mailer::short_label( $np->mailer ), 'mail(): log text', NanoPost_Email_Check_Mailer::short_label( $np->mailer ) );
+np_assert( 'Sends through PHP mail()' === NanoPost_Email_Check_Mailer::describe( array( 'type' => 'mail' ) ), 'mail(): status text with no set-up plugin' );
 remove_filter( 'nanopost_email_check_sendmail_command', $np_cmd, 10 );
 
 // sendmail: the command is PHPMailer's Sendmail.
@@ -172,6 +168,48 @@ if ( null !== $np_saved_pre ) {
 	$wp_filter['pre_wp_mail'] = $np_saved_pre; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores the hooks saved above.
 }
 
+// The plugin that set up PHPMailer: named only when all other phpmailer_init callbacks
+// belong to one plugin. This file is in this plugin's folder, so its closures count as
+// this plugin; a WordPress function counts as no plugin.
+np_diag_no_send();
+add_action(
+	'phpmailer_init',
+	static function ( $mailer ) {
+		$mailer->isSMTP();
+		$mailer->Host = 'smtp.example.com'; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		$mailer->Port = 587; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+	},
+	5
+);
+$np = np_diag_run();
+np_assert( 'nanoPost Email Check' === $np->mailer['by'], 'set up by: two callbacks of one plugin name it', $np->mailer );
+np_assert( 'Sends through SMTP smtp.example.com:587, set up by nanoPost Email Check' === NanoPost_Email_Check_Mailer::describe( $np->mailer ), 'set up by: status text', NanoPost_Email_Check_Mailer::describe( $np->mailer ) );
+np_assert( 'SMTP smtp.example.com:587 (nanoPost Email Check)' === NanoPost_Email_Check_Mailer::short_label( $np->mailer ), 'set up by: log text', NanoPost_Email_Check_Mailer::short_label( $np->mailer ) );
+add_action( 'phpmailer_init', '__return_null', 20 );
+$np = np_diag_run();
+np_assert( 'smtp' === $np->mailer['type'] && '' === $np->mailer['by'], 'set up by: no name when a callback is not in one plugin', $np->mailer );
+remove_all_actions( 'phpmailer_init' );
+$np = np_diag_run();
+np_assert( '' === $np->mailer['by'], 'set up by: no name when nothing else hooks phpmailer_init', $np->mailer );
+np_assert(
+	'' === NanoPost_Email_Check_Mailer::normalize(
+		array(
+			'type' => 'plugin',
+			'by'   => 'X',
+		)
+	)['by'],
+	'set up by: not kept for a plugin that handles the sending itself'
+);
+np_assert(
+	'X' === NanoPost_Email_Check_Mailer::normalize(
+		array(
+			'type' => 'smtp',
+			'by'   => 'X<b>',
+		)
+	)['by'],
+	'set up by: kept as plain text for a mailer type'
+);
+
 // A plugin that swaps in its own PHPMailer subclass and sends by API, while Mailer reads
 // "mail" (as SMTP2GO does): recorded as handled by that plugin, with no sendmail cause.
 require_once ABSPATH . WPINC . '/PHPMailer/PHPMailer.php';
@@ -227,6 +265,7 @@ np_assert(
 		'port' => 0,
 		'name' => '',
 		'via'  => '',
+		'by'   => '',
 	) === NanoPost_Email_Check_Mailer::normalize( array( 'type' => 'evil' ) ),
 	'an unknown type is not kept'
 );
