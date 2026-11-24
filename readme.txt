@@ -104,6 +104,7 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 1. The plugin screen at Tools > Email Check: status, settings, and the result log.
 2. The notice in wp-admin when a check fails, with a link to decode the error.
 3. The notice when scheduled checks have stopped running.
+4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
 

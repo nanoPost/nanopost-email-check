@@ -66,6 +66,18 @@
 			"alt": "A yellow admin notice on the Dashboard: Email checks have stopped, with a WP-Cron note and links."
 		},
 		{
+			"id": "wporg-4",
+			"out": ".wordpress-org/screenshot-4.png",
+			"width": 1280,
+			"html": "screenshots/alert.html",
+			"data": "wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php alert",
+			"top": true,
+			"to": "#card",
+			"pad": 56,
+			"caption": "An alert in a chat app when a check fails, sent through the optional webhook.",
+			"alt": "A chat channel with two messages from Email Check: Email check failed on the site with SMTP Error: Could not authenticate, then Email check passed again."
+		},
+		{
 			"id": "help-status-settings",
 			"out": "screenshots/help/status-settings.webp",
 			"width": 1000,
