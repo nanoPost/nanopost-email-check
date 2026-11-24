@@ -19,9 +19,9 @@ nanoPost Email Check sends a test email on a schedule and logs each result. It s
 = What to expect =
 
 1. **Set up on one screen.** Choose the mailbox for the test emails and how often to check, then press **Send test now** to see a first result.
-2. **Then there is nothing to do.** A short test email arrives on schedule, daily by default. The plugin keeps a log of every result.
-3. **When sending breaks,** a notice in wp-admin shows the error and links to an explanation of it. With a webhook set, a message also goes to Slack, Google Chat, Discord or another chat app, so the alert does not depend on the email that just broke.
-4. **When it is fixed,** the next passing check clears the notice, and the webhook sends one message to say email works again.
+2. **Then it runs on its own.** A short test email is sent on schedule, daily by default. The plugin logs every result.
+3. **When sending breaks,** a notice in wp-admin shows the error and links to an explanation of it. With a webhook set, a message also goes to Slack, Google Chat, Discord or another service that accepts a webhook, so the alert does not depend on the email that just failed.
+4. **When it is fixed,** the next passing check clears the notice, and the webhook sends a recovery message.
 5. **If the checks themselves stop,** for example because WP-Cron is not running, a separate notice tells you.
 
 = Who it is for =
@@ -32,7 +32,7 @@ nanoPost Email Check sends a test email on a schedule and logs each result. It s
 
 = How it differs from SMTP and email log plugins =
 
-SMTP and email log plugins send and record the site's real mail, and some of them alert on a failure. All of that depends on the site sending something. Email Check sends its own test on a schedule, so it finds a break on a quiet day too, and it tells you when the checks themselves have stopped. It works with any SMTP plugin. It does not replace one.
+SMTP and email log plugins send and record the site's real mail, and some of them alert when a message fails. Those logs and alerts concern messages the site actually sends. Email Check sends its own test on a schedule, so it can check on a day the site sends nothing else, and it tells you when the tests themselves have stopped. The test goes through `wp_mail()`, so an SMTP plugin that handles `wp_mail()` sends it through its configured mailer. Email Check does not replace or configure the mailer.
 
 = Features =
 
