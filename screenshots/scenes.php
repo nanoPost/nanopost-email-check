@@ -95,7 +95,21 @@ if ( 'stale' === $scene ) {
 
 delete_option( NanoPost_Email_Check_Log::OPTION );
 foreach ( $rows as $row ) {
-	NanoPost_Email_Check_Log::add( new NanoPost_Email_Check_Result( 'wp_mail', $row[0], $row[1], $row[2], $to, $row[3] ) );
+	NanoPost_Email_Check_Log::add(
+		new NanoPost_Email_Check_Result(
+			'wp_mail',
+			$row[0],
+			$row[1],
+			$row[2],
+			$to,
+			$row[3],
+			array(
+				'type' => 'smtp',
+				'host' => 'smtp.example.com',
+				'port' => 587,
+			)
+		)
+	);
 }
 
 update_option(
