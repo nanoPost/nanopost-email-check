@@ -42,6 +42,7 @@ SMTP and email log plugins send and record the site's real mail, and some of the
 * **Notice when a check fails,** for administrators, with the error and a link that explains it. It clears by itself when the next check passes. Each user can dismiss it, and a new failure shows it again.
 * **Notice when the checks stop:** if no scheduled check has finished for twice the interval. The usual causes are WP-Cron not running, or a check that crashes with a PHP error.
 * **Optional chat alerts:** post failures to Slack, Google Chat, Discord or any service that accepts a webhook, so you can receive alerts even when WordPress cannot send email. It also sends a recovery message when a check passes after a failure.
+* **Send test alert:** check the webhook without waiting for a real failure.
 * **Troubleshooting help:** links from failed or stopped checks to help pages on nanopo.st, including an error decoder.
 * **Multisite:** each site runs its own checks, with its own settings, log and notices.
 * **No outside requests** unless you set a webhook. Nothing is sent to nanoPost.
