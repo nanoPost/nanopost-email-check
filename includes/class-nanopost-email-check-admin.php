@@ -159,7 +159,7 @@ class NanoPost_Email_Check_Admin {
 		$settings = NanoPost_Email_Check_Settings::get();
 		$admin    = (string) get_option( 'admin_email' );
 		printf(
-			'<input type="email" class="regular-text" id="nanopost_email_check_recipient" name="%1$s[recipient]" value="%2$s" placeholder="%3$s"%4$s />',
+			'<input type="email" multiple class="regular-text" id="nanopost_email_check_recipient" name="%1$s[recipient]" value="%2$s" placeholder="%3$s"%4$s />',
 			esc_attr( NanoPost_Email_Check_Settings::OPTION ),
 			esc_attr( $settings['recipient'] ),
 			esc_attr( $admin ),
@@ -168,8 +168,9 @@ class NanoPost_Email_Check_Admin {
 		self::locked_note( 'recipient' );
 		echo '<p class="description">';
 		printf(
-			/* translators: %s: site admin email address. */
-			esc_html__( 'Use an address you read often, ideally at a different provider from this site. Leave empty to use the site admin email (%s).', 'nanopost-email-check' ),
+			/* translators: 1: maximum number of addresses, 2: site admin email address. */
+			esc_html__( 'Use an address you read often, ideally at a different provider from this site. To send each test to more than one address, for example your own and a monitoring address, enter up to %1$d addresses separated by commas. Leave empty to use the site admin email (%2$s).', 'nanopost-email-check' ),
+			(int) NanoPost_Email_Check_Settings::MAX_RECIPIENTS,
 			esc_html( $admin )
 		);
 		echo '</p>';

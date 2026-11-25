@@ -63,6 +63,13 @@ $GLOBALS['np_constants'] = array(
 np_assert( get_option( 'admin_email' ) === NanoPost_Email_Check_Settings::recipient(), 'empty recipient constant: site admin email' );
 np_assert( '' === NanoPost_Email_Check_Settings::webhook_url() && NanoPost_Email_Check_Settings::locked( 'webhook_url' ), 'empty webhook constant: no webhook, locked' );
 
+// A comma list in the constant, with the same rules as the screen.
+$GLOBALS['np_constants'] = array( 'NANOPOST_EMAIL_CHECK_RECIPIENT' => 'me@example.com,canary@example.net' );
+np_assert( 'me@example.com, canary@example.net' === NanoPost_Email_Check_Settings::recipient() && NanoPost_Email_Check_Settings::locked( 'recipient' ), 'constant comma list: used, locked', NanoPost_Email_Check_Settings::recipient() );
+$GLOBALS['np_constants'] = array( 'NANOPOST_EMAIL_CHECK_RECIPIENT' => 'a@example.com, b@example.com, c@example.com, d@example.com' );
+$np_errors               = NanoPost_Email_Check_Settings::errors();
+np_assert( NanoPost_Email_Check_Settings::get()['recipient'] === $np_saved['recipient'] && 1 === count( $np_errors ) && false !== strpos( $np_errors[0]['message'], 'at most 3' ), 'constant with 4 addresses: ignored and reported', $np_errors );
+
 // Invalid constants are ignored and reported.
 $GLOBALS['np_constants'] = array(
 	'NANOPOST_EMAIL_CHECK_RECIPIENT'   => 'first last@example.org',

@@ -38,10 +38,11 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 	 * @return NanoPost_Email_Check_Result
 	 */
 	public function run( $trigger ) {
-		$recipient = NanoPost_Email_Check_Settings::recipient();
-		$time      = time();
+		$recipient  = NanoPost_Email_Check_Settings::recipient();
+		$recipients = NanoPost_Email_Check_Settings::recipients();
+		$time       = time();
 
-		if ( ! is_email( $recipient ) ) {
+		if ( array() === $recipients || count( $recipients ) !== count( array_filter( $recipients, 'is_email' ) ) ) {
 			return new NanoPost_Email_Check_Result(
 				$this->id(),
 				$trigger,
@@ -62,7 +63,7 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		$watch = new NanoPost_Email_Check_Mailer();
 		$watch->start();
 		add_action( 'wp_mail_failed', $catch );
-		$sent = (bool) wp_mail( $recipient, $this->subject( $trigger ), $this->message( $trigger, $time ) );
+		$sent = (bool) wp_mail( $recipients, $this->subject( $trigger ), $this->message( $trigger, $time ) );
 		remove_action( 'wp_mail_failed', $catch );
 		$watch->stop();
 

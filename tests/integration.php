@@ -185,6 +185,24 @@ np_assert( 'owner@example.com' === $np['recipient'], 'address with a space is re
 $np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => 'first.last+tag@example.org' ) );
 np_assert( 'first.last+tag@example.org' === $np['recipient'], 'valid address with + is kept as typed', $np );
 
+// A comma list: up to three addresses, each trimmed, stored joined with ", ".
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'owner@example.com' ) );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => ' me@example.com ,canary+k7f3q9x2@example.net, ' ) );
+np_assert( 'me@example.com, canary+k7f3q9x2@example.net' === $np['recipient'], 'comma list is kept, trimmed, empty parts dropped', $np );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => 'a@example.com, b@example.com, c@example.com' ) );
+np_assert( 'a@example.com, b@example.com, c@example.com' === $np['recipient'], 'three addresses are allowed', $np );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => 'a@example.com, b@example.com, c@example.com, d@example.com' ) );
+np_assert( 'owner@example.com' === $np['recipient'], 'four addresses are refused, the saved value is kept', $np );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => 'a@example.com, not-an-email' ) );
+np_assert( 'owner@example.com' === $np['recipient'], 'one bad address in a list refuses the whole value', $np );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => 'a@example.com; b@example.com' ) );
+np_assert( 'owner@example.com' === $np['recipient'], 'a semicolon is not a separator', $np );
+$np = NanoPost_Email_Check_Settings::sanitize( array( 'recipient' => ' , ' ) );
+np_assert( '' === $np['recipient'], 'only commas means empty', $np );
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'me@example.com, canary@example.net' ) );
+np_assert( array( 'me@example.com', 'canary@example.net' ) === NanoPost_Email_Check_Settings::recipients(), 'recipients() gives the list', NanoPost_Email_Check_Settings::recipients() );
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'owner@example.com' ) );
+
 $np = NanoPost_Email_Check_Settings::sanitize( array( 'interval' => 'hourly' ) );
 np_assert( 'daily' === $np['interval'], 'unknown interval becomes daily', $np );
 
@@ -305,6 +323,17 @@ if ( $np_mailpit_up ) {
 	np_assert( ! $np_results[0]->passed, 'check fails when SMTP is down' );
 	np_assert( false !== stripos( $np_results[0]->error, 'connect' ), 'error text comes from wp_mail_failed', $np_results[0]->error );
 	np_assert( 0 === strpos( NanoPost_Email_Check_Help::for_failure( $np_results[0] ), 'https://nanopo.st/email-check-plugin/error/?utm_source=wp-admin&utm_medium=email-check#error=' ), 'failure with text links to the decoder' );
+
+	// A comma list: one email, with every address in To.
+	np_smtp( true );
+	np_mailpit( 'DELETE', 'messages' );
+	update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'check@example.com, canary+k7f3q9x2@example.net' ) );
+	$np_results = NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_MANUAL );
+	np_assert( $np_results[0]->passed && 'check@example.com, canary+k7f3q9x2@example.net' === $np_results[0]->recipient, 'comma list: check passes, both addresses recorded', $np_results[0]->to_array() );
+	$np_list = np_mailpit( 'GET', 'messages' );
+	$np_to   = isset( $np_list['messages'][0]['To'] ) ? wp_list_pluck( $np_list['messages'][0]['To'], 'Address' ) : array();
+	np_assert( 1 === (int) ( $np_list['total'] ?? 0 ) && array( 'check@example.com', 'canary+k7f3q9x2@example.net' ) === $np_to, 'comma list: one email to both addresses', $np_list['messages'][0]['To'] ?? null );
+	update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'check@example.com' ) );
 
 	remove_all_actions( 'phpmailer_init' );
 }

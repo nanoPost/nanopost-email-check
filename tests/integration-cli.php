@@ -76,6 +76,11 @@ np_reset();
 
 np_assert( 'owner@example.com' === NanoPost_Email_Check_Settings::validate( 'recipient', ' owner@example.com ' ), 'validate: address is trimmed' );
 np_assert( '' === NanoPost_Email_Check_Settings::validate( 'recipient', '' ), 'validate: empty address is allowed' );
+np_assert( 'a@example.com, b@example.com' === NanoPost_Email_Check_Settings::validate( 'recipient', 'a@example.com,b@example.com' ), 'validate: comma list joined with ", "' );
+$np = NanoPost_Email_Check_Settings::validate( 'recipient', 'a@example.com, b@example.com, c@example.com, d@example.com' );
+np_assert( is_wp_error( $np ) && 'too_many_recipients' === $np->get_error_code() && false !== strpos( $np->get_error_message(), 'at most 3' ), 'validate: more than 3 addresses refused', $np );
+$np = NanoPost_Email_Check_Settings::validate( 'recipient', 'a@example.com, not-an-email' );
+np_assert( is_wp_error( $np ) && false !== strpos( $np->get_error_message(), 'not valid: not-an-email.' ), 'validate: the error names the bad address', $np );
 foreach ( array( 'not-an-email', 'first last@example.org' ) as $np_value ) {
 	$np = NanoPost_Email_Check_Settings::validate( 'recipient', $np_value );
 	np_assert( is_wp_error( $np ) && 'invalid_recipient' === $np->get_error_code(), 'validate: address refused: ' . $np_value );
@@ -103,9 +108,15 @@ np_assert( 'owner@example.com' === NanoPost_Email_Check_Settings::get()['recipie
 $np_before = get_option( NanoPost_Email_Check_Settings::OPTION );
 foreach ( array( 'not-an-email', "'first last@example.org'" ) as $np_value ) {
 	$np_out = np_cli( 'settings set recipient ' . $np_value );
-	np_assert( 1 === $np_out->return_code && false !== strpos( $np_out->stderr, 'The email address is not valid.' ), 'set recipient: invalid address exits 1 with the screen message: ' . $np_value, $np_out );
+	np_assert( 1 === $np_out->return_code && false !== strpos( $np_out->stderr, 'The email address is not valid: ' ), 'set recipient: invalid address exits 1 with the screen message: ' . $np_value, $np_out );
 }
 np_assert( get_option( NanoPost_Email_Check_Settings::OPTION ) === $np_before, 'set recipient: an invalid address changes nothing' );
+
+$np_out = np_cli( 'settings set recipient "me@example.com, canary@example.net"' );
+np_assert( 0 === $np_out->return_code && 'me@example.com, canary@example.net' === NanoPost_Email_Check_Settings::get()['recipient'], 'set recipient: a comma list is saved', $np_out );
+$np_out = np_cli( 'settings set recipient "a@example.com, b@example.com, c@example.com, d@example.com"' );
+np_assert( 1 === $np_out->return_code && 'me@example.com, canary@example.net' === NanoPost_Email_Check_Settings::get()['recipient'], 'set recipient: 4 addresses exit 1 and change nothing', $np_out );
+np_cli( 'settings set recipient owner@example.com' );
 
 $np_out   = np_cli( 'settings set interval weekly' );
 $np_event = wp_get_scheduled_event( NanoPost_Email_Check_Scheduler::HOOK );
