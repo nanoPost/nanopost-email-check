@@ -68,7 +68,7 @@ Writing about the plugin? The [reviewer's guide](https://nanopo.st/email-check-p
 
 1. Install the plugin from **Plugins > Add Plugin** (**Add New Plugin** in older WordPress versions) and activate it, or upload the `nanopost-email-check` folder to `/wp-content/plugins/`.
 2. Go to **Tools > Email Check**.
-3. Enter the address that should receive the test emails, or leave it empty to use the site's Administration Email Address. Use a mailbox someone reads, at a different provider from the site if you can.
+3. Enter the address that should receive the test emails, or leave it empty to use the site's Administration Email Address. Use a mailbox someone reads, at a different provider from the site if you can. To send each test to more than one address, enter up to 3 addresses separated by commas.
 4. Choose how often to check, and save.
 5. Press **Send test now** and check that the email arrives.
 
@@ -90,7 +90,7 @@ No. A pass means WordPress handed the message to its mail system without an erro
 
 = Does the plugin send email to my users or customers? =
 
-No. It sends test emails only to the one address you set.
+No. It sends test emails only to the address or addresses you set (at most 3).
 
 = Does the plugin send data to nanoPost? =
 
@@ -166,6 +166,9 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.6.0 =
+* The recipient setting takes up to 3 addresses, separated by commas, for example your own address and a monitoring address. Each test is one email to all of them. The same rules apply on the plugin screen, in WP-CLI and in the `NANOPOST_EMAIL_CHECK_RECIPIENT` constant.
 
 = 1.5.0 =
 * WP-CLI: `wp email-check status` says whether WP-Cron is disabled in `wp-config.php`, and whether an event has been due for more than 10 minutes, which shows that nothing has run WP-Cron since then.

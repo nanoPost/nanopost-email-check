@@ -17,6 +17,11 @@ class NanoPost_Email_Check_Settings {
 	const GROUP  = 'nanopost_email_check';
 
 	/**
+	 * Most addresses the recipient setting takes.
+	 */
+	const MAX_RECIPIENTS = 3;
+
+	/**
 	 * Schedules the owner can choose. All are built into WordPress.
 	 *
 	 * @return array Schedule name => label.
@@ -248,12 +253,7 @@ class NanoPost_Email_Check_Settings {
 		$raw = is_scalar( $value ) ? trim( (string) $value ) : null;
 
 		if ( 'recipient' === $key ) {
-			// Accept the address only as typed: sanitize_email() would silently turn
-			// "first last@example.org" into a different address.
-			if ( '' === $raw || ( null !== $raw && is_email( $raw ) && sanitize_email( $raw ) === $raw ) ) {
-				return $raw;
-			}
-			return new WP_Error( 'invalid_recipient', __( 'The email address is not valid. The previous address was kept.', 'nanopost-email-check' ) );
+			return self::validate_recipients( $raw );
 		}
 
 		if ( 'interval' === $key ) {
@@ -287,6 +287,58 @@ class NanoPost_Email_Check_Settings {
 	}
 
 	/**
+	 * Check a recipient value: one address, or up to MAX_RECIPIENTS addresses separated by
+	 * commas. Each address is trimmed. One bad address refuses the whole value.
+	 *
+	 * @param string|null $raw Trimmed value, or null for a value that is not a string.
+	 * @return string|WP_Error The addresses joined with ", ", or an error.
+	 */
+	private static function validate_recipients( $raw ) {
+		if ( null === $raw ) {
+			return new WP_Error( 'invalid_recipient', __( 'The email address is not valid. The previous address was kept.', 'nanopost-email-check' ) );
+		}
+
+		$addresses = self::split_recipients( $raw );
+		if ( count( $addresses ) > self::MAX_RECIPIENTS ) {
+			return new WP_Error(
+				'too_many_recipients',
+				sprintf(
+					/* translators: %d: maximum number of addresses. */
+					__( 'Enter at most %d email addresses, separated by commas. The previous address was kept.', 'nanopost-email-check' ),
+					self::MAX_RECIPIENTS
+				)
+			);
+		}
+
+		foreach ( $addresses as $address ) {
+			// Accept the address only as typed: sanitize_email() would silently turn
+			// "first last@example.org" into a different address.
+			if ( ! is_email( $address ) || sanitize_email( $address ) !== $address ) {
+				return new WP_Error(
+					'invalid_recipient',
+					sprintf(
+						/* translators: %s: the address as entered. */
+						__( 'The email address is not valid: %s. The previous address was kept.', 'nanopost-email-check' ),
+						$address
+					)
+				);
+			}
+		}
+
+		return implode( ', ', $addresses );
+	}
+
+	/**
+	 * Split a recipient value at the commas. Trims each part and drops empty parts.
+	 *
+	 * @param string $value Recipient value.
+	 * @return string[]
+	 */
+	public static function split_recipients( $value ) {
+		return array_values( array_filter( array_map( 'trim', explode( ',', (string) $value ) ), 'strlen' ) );
+	}
+
+	/**
 	 * Error record for an ignored value from code.
 	 *
 	 * @param string $key    Setting key.
@@ -304,7 +356,8 @@ class NanoPost_Email_Check_Settings {
 		}
 
 		if ( 'recipient' === $key ) {
-			$reason = __( 'It is not a valid email address.', 'nanopost-email-check' );
+			/* translators: %d: maximum number of addresses. */
+			$reason = sprintf( __( 'It must be a valid email address, or at most %d valid addresses separated by commas.', 'nanopost-email-check' ), self::MAX_RECIPIENTS );
 		} elseif ( 'interval' === $key ) {
 			/* translators: %s: list of schedule names. */
 			$reason = sprintf( __( 'It must be one of: %s.', 'nanopost-email-check' ), implode( ', ', array_keys( self::intervals() ) ) );
@@ -322,13 +375,23 @@ class NanoPost_Email_Check_Settings {
 	}
 
 	/**
-	 * The address test emails go to: the saved address, or the site admin email.
+	 * The address or addresses test emails go to, as one string: the saved value (addresses
+	 * separated by ", "), or the site admin email.
 	 *
 	 * @return string
 	 */
 	public static function recipient() {
 		$settings = self::get();
 		return '' !== $settings['recipient'] ? $settings['recipient'] : (string) get_option( 'admin_email' );
+	}
+
+	/**
+	 * The addresses test emails go to, as a list.
+	 *
+	 * @return string[]
+	 */
+	public static function recipients() {
+		return self::split_recipients( self::recipient() );
 	}
 
 	/**

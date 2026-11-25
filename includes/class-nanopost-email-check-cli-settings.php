@@ -12,7 +12,8 @@ defined( 'ABSPATH' ) || exit;
  *
  * Settings:
  *
- * * recipient: the address for the test emails. Empty means the site admin email.
+ * * recipient: the address for the test emails, or up to 3 addresses separated by
+ *   commas. Empty means the site admin email.
  * * interval: twicedaily, daily or weekly.
  * * webhook_url: the URL for alerts. Empty means no webhook.
  *
@@ -100,6 +101,9 @@ class NanoPost_Email_Check_CLI_Settings {
 	 *
 	 *     $ wp email-check settings set recipient owner@example.com
 	 *     Success: Saved recipient: "owner@example.com".
+	 *
+	 *     $ wp email-check settings set recipient "owner@example.com, monitor@example.net"
+	 *     Success: Saved recipient: "owner@example.com, monitor@example.net".
 	 *
 	 *     $ wp email-check settings set webhook_url https://hooks.slack.com/services/T000/B000/XXXX
 	 *     Success: Saved webhook_url: "https://hooks.slack.com/services/T000/B000/XXXX".
