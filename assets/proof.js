@@ -60,7 +60,7 @@
 				var data = answer.data;
 				if ( 'arrived' === data.status ) {
 					return show(
-						format( cfg.text.arrived, [ localTime( data.arrived_at ) ] ) +
+						format( cfg.text.arrived, [ data.arrived || localTime( data.arrived_at ) ] ) +
 							' ' +
 							format( cfg.text.auth, [ data.spf, data.dkim, data.dmarc ] )
 					);

@@ -581,6 +581,7 @@ $np_json  = $np_ajax( $np_test );
 $np_calls = np_app_take();
 np_assert( 1 === count( $np_calls ) && 'GET' === $np_calls[0]['method'] && '/tests/' . $np_test === $np_calls[0]['path'] && 5 === $np_calls[0]['timeout'], 'proof: GET /tests/<id>, 5 seconds', $np_calls );
 np_assert( ! empty( $np_json['success'] ) && 'arrived' === $np_json['data']['status'] && 'fail' === $np_json['data']['dmarc'], 'proof: the result goes to the browser', $np_json );
+np_assert( NanoPost_Email_Check_Admin::format_date( strtotime( '2026-11-24T11:40:21Z' ) ) === $np_json['data']['arrived'], 'proof: the arrival time in the site format', $np_json['data'] );
 np_assert( ! isset( $np_json['data']['secret'] ) && false === strpos( wp_json_encode( $np_json ), 'tok-' ), 'proof: only the known fields, never the token', $np_json );
 np_app_answer( 404, array( 'error' => 'unknown_test' ) );
 $np_json = $np_ajax( $np_test );

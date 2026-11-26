@@ -429,6 +429,8 @@ class NanoPost_Email_Check_Admin {
 			$fields[ $key ] = isset( $body[ $key ] ) && is_string( $body[ $key ] ) ? $body[ $key ] : null;
 		}
 		$fields['status']    = in_array( $fields['status'], array( 'waiting', 'arrived', 'missing', 'send_failed' ), true ) ? $fields['status'] : 'waiting';
+		$arrived             = null === $fields['arrived_at'] ? false : strtotime( $fields['arrived_at'] );
+		$fields['arrived']   = false === $arrived ? null : self::format_date( $arrived );
 		$fields['check_url'] = isset( $body['check_url'] ) && is_string( $body['check_url'] ) ? esc_url_raw( $body['check_url'], array( 'https', 'http' ) ) : NanoPost_Email_Check_Connection::get()['check_url'];
 		wp_send_json_success( $fields );
 	}
