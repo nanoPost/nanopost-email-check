@@ -84,7 +84,7 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		if ( '' !== $test_id ) {
 			$result->test_id  = $test_id;
 			$call             = NanoPost_Email_Check_App::announce( $test_id, $time, $trigger, $sent, $sent ? '' : NanoPost_Email_Check_App::announce_error( $error, $cause ) );
-			$result->announce = $call['ok'] ? NanoPost_Email_Check_Result::ANNOUNCE_OK : NanoPost_Email_Check_Result::ANNOUNCE_FAILED;
+			$result->announce = $call['ok'] ? NanoPost_Email_Check_Result::ANNOUNCE_OK : ( 401 === $call['code'] ? NanoPost_Email_Check_Result::ANNOUNCE_ENDED : NanoPost_Email_Check_Result::ANNOUNCE_FAILED );
 		}
 
 		return $result;

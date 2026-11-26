@@ -381,6 +381,24 @@ np_assert( $np_hooks() === $np_n + 3 && '' === $np_status(), 'then announce 2xx,
 $np_run( true );
 np_assert( $np_hooks() === $np_n + 3, 'then announce 2xx, passed: no second recovery from the plugin' );
 
+// 401: the connection ended (a move); no fallback alert for the refused test.
+$np_run( false, 503 );
+np_assert( $np_hooks() === $np_n + 4 && 'fail' === $np_status(), 'fallback alert again (state fail)' );
+np_app_answer(
+	401,
+	array(
+		'error'   => 'invalid_token',
+		'message' => 'x',
+	)
+);
+add_filter( 'pre_wp_mail', '__return_false' );
+$np_r = NanoPost_Email_Check_Plugin::run_checks( 'scheduled' )[0];
+remove_filter( 'pre_wp_mail', '__return_false' );
+np_app_take();
+np_assert( NanoPost_Email_Check_Result::ANNOUNCE_ENDED === $np_r->announce && $np_hooks() === $np_n + 4 && '' === $np_status(), 'announce 401, failed: no fallback alert, state cleared (the connection ended)', $np_r->to_array() );
+np_assert( 'ended' === NanoPost_Email_Check_Log::latest()->announce, 'the log keeps the "ended" outcome' );
+np_app_connect();
+
 // Other checks keep the plugin webhook.
 add_filter(
 	'nanopost_email_check_checks',
@@ -401,7 +419,7 @@ add_filter(
 );
 $np_run( true );
 remove_filter( 'nanopost_email_check_checks', $np_other );
-np_assert( $np_hooks() === $np_n + 4, 'another check that fails still alerts through the plugin webhook' );
+np_assert( $np_hooks() === $np_n + 5, 'another check that fails still alerts through the plugin webhook' );
 
 // Disconnect resets the wp_mail state.
 $np_run( false, 503 );

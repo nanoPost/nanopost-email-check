@@ -24,6 +24,7 @@ class NanoPost_Email_Check_Result {
 
 	const ANNOUNCE_OK     = 'ok';
 	const ANNOUNCE_FAILED = 'failed';
+	const ANNOUNCE_ENDED  = 'ended';
 
 	/**
 	 * Check id, from NanoPost_Email_Check_Check::id().
@@ -85,7 +86,8 @@ class NanoPost_Email_Check_Result {
 
 	/**
 	 * Whether nanoPost took the announce call for this test: ANNOUNCE_OK, ANNOUNCE_FAILED,
-	 * or '' when no call was due (not connected).
+	 * ANNOUNCE_ENDED (nanoPost answered 401: the connection had ended, for example the
+	 * check moved to another site), or '' when no call was due (not connected).
 	 *
 	 * @var string
 	 */
@@ -192,7 +194,7 @@ class NanoPost_Email_Check_Result {
 
 		$result           = new self( $data['check'], $data['trigger'], $data['passed'], $data['error'], $data['recipient'], $data['time'], $data['mailer'] );
 		$result->test_id  = is_string( $data['test_id'] ) && preg_match( '/^[a-z0-9]{12}$/', $data['test_id'] ) ? $data['test_id'] : '';
-		$result->announce = in_array( $data['announce'], array( self::ANNOUNCE_OK, self::ANNOUNCE_FAILED ), true ) ? $data['announce'] : '';
+		$result->announce = in_array( $data['announce'], array( self::ANNOUNCE_OK, self::ANNOUNCE_FAILED, self::ANNOUNCE_ENDED ), true ) ? $data['announce'] : '';
 		return $result;
 	}
 }
