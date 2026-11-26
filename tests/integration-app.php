@@ -132,7 +132,10 @@ add_filter(
 np_section( 'App: not connected' );
 np_reset();
 np_app_take();
-np_assert( 'https://app.nanopo.st/api/v1' === NanoPost_Email_Check_App::base_url(), 'base URL is the production API' );
+// The dev site may point at the staging app with NANOPOST_EMAIL_CHECK_APP_URL.
+$np_app_base = defined( 'NANOPOST_EMAIL_CHECK_APP_URL' ) ? untrailingslashit( NANOPOST_EMAIL_CHECK_APP_URL ) : 'https://app.nanopo.st/api/v1';
+$np_app_page = preg_replace( '#/api/v1$#', '', $np_app_base ) . '/connect?';
+np_assert( $np_app_base === NanoPost_Email_Check_App::base_url(), 'base URL: the production API, or the constant', NanoPost_Email_Check_App::base_url() );
 np_assert( ! NanoPost_Email_Check_Connection::is_connected() && ! NanoPost_Email_Check_Connection::calls_allowed(), 'no connection, no calls' );
 $np = NanoPost_Email_Check_App::announce( 'abcdefabcdef', time(), 'manual', true, '' );
 np_assert( ! $np['ok'] && 'not_connected' === $np['error'] && array() === np_app_take(), 'announce without a connection makes no call', $np );
@@ -143,7 +146,7 @@ np_assert( '' === $np_results[0]->test_id && '' === $np_results[0]->announce && 
 remove_filter( 'pre_wp_mail', '__return_true' );
 
 $np_url = NanoPost_Email_Check_App::connect_url( 'https://example.org/wp-admin/admin-post.php?action=x', 'st&te' );
-np_assert( 0 === strpos( $np_url, 'https://app.nanopo.st/connect?' ), 'connect page: the API base without /api/v1', $np_url );
+np_assert( 0 === strpos( $np_url, $np_app_page ), 'connect page: the API base without /api/v1', $np_url );
 parse_str( (string) wp_parse_url( $np_url, PHP_URL_QUERY ), $np_q );
 np_assert( home_url() === $np_q['site'] && 'https://example.org/wp-admin/admin-post.php?action=x' === $np_q['return'] && 'st&te' === $np_q['state'], 'connect page: site, return and state survive the URL', $np_q );
 
@@ -489,7 +492,7 @@ np_nonce( null );
 np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) ), 'die:' ), 'connect: no nonce is refused' );
 np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::CONNECT_ACTION ) );
 $np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) );
-np_assert( 0 === strpos( $np_out, 'redirect:https://app.nanopo.st/connect?' ), 'connect: redirect to the app connect page', $np_out );
+np_assert( 0 === strpos( $np_out, 'redirect:' . $np_app_page ), 'connect: redirect to the app connect page', $np_out );
 parse_str( (string) wp_parse_url( substr( $np_out, 9 ), PHP_URL_QUERY ), $np_q );
 $np_state = get_transient( NanoPost_Email_Check_Admin::STATE_PREFIX . $np_admin_id );
 np_assert( is_string( $np_state ) && 32 === strlen( $np_state ) && $np_state === $np_q['state'], 'connect: a 32-character state is stored for the user and sent', $np_q );
