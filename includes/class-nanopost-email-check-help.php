@@ -32,6 +32,14 @@ class NanoPost_Email_Check_Help {
 	const PLACE_NOTICE_FAILED = 'notice-failed';
 	const PLACE_NOTICE_STALE  = 'notice-stale';
 	const PLACE_CLI           = 'cli';
+	const PLACE_CONNECTION    = 'connection';
+	const PLACE_PROOF         = 'proof';
+
+	/**
+	 * The app's terms and privacy sections. Plain links, shown next to "Connect".
+	 */
+	const TERMS_URL   = 'https://nanopo.st/terms/#the-app-appnanopost';
+	const PRIVACY_URL = 'https://nanopo.st/privacy/#the-app-appnanopost';
 
 	/**
 	 * Plugin home page.
@@ -95,6 +103,26 @@ class NanoPost_Email_Check_Help {
 	 */
 	public static function webhook( $place = '' ) {
 		return self::url( 'webhook/', $place );
+	}
+
+	/**
+	 * What connecting to nanoPost does.
+	 *
+	 * @param string $place Where the link is shown.
+	 * @return string
+	 */
+	public static function connect( $place = '' ) {
+		return self::url( 'connect/', $place );
+	}
+
+	/**
+	 * The proof of arrival after "Send test now".
+	 *
+	 * @param string $place Where the link is shown.
+	 * @return string
+	 */
+	public static function proof( $place = '' ) {
+		return self::url( 'connect/', $place, 'proof-of-arrival' );
 	}
 
 	/**

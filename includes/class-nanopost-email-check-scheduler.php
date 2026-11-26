@@ -100,12 +100,14 @@ class NanoPost_Email_Check_Scheduler {
 	public static function deactivate( $network_wide = false ) {
 		if ( ! is_multisite() || ! $network_wide ) {
 			wp_clear_scheduled_hook( self::HOOK );
+			wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 			return;
 		}
 
 		foreach ( self::site_ids() as $site_id ) {
 			switch_to_blog( $site_id );
 			wp_clear_scheduled_hook( self::HOOK );
+			wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 			restore_current_blog();
 		}
 	}
@@ -156,6 +158,9 @@ class NanoPost_Email_Check_Scheduler {
 		// Only reached when the checks finished. WP-Cron has already booked the next run,
 		// so a crash here leaves a future event but no new time.
 		self::update_state( 'last_completed', time() );
+		// While connected: send the site settings when they changed (values from code,
+		// WordPress and PHP updates). Does nothing when they did not.
+		NanoPost_Email_Check_App::sync_site();
 		// Follow an interval set in code that changed since the event was booked, also on
 		// sites where nobody opens the admin area.
 		self::ensure_scheduled();

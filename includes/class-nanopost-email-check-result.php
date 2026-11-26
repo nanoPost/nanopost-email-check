@@ -22,6 +22,9 @@ class NanoPost_Email_Check_Result {
 	 */
 	const MAX_ERROR_LENGTH = 4000;
 
+	const ANNOUNCE_OK     = 'ok';
+	const ANNOUNCE_FAILED = 'failed';
+
 	/**
 	 * Check id, from NanoPost_Email_Check_Check::id().
 	 *
@@ -72,6 +75,21 @@ class NanoPost_Email_Check_Result {
 	 * @var array
 	 */
 	public $mailer;
+
+	/**
+	 * ID of the test in nanoPost, while the site is connected. Empty otherwise.
+	 *
+	 * @var string
+	 */
+	public $test_id = '';
+
+	/**
+	 * Whether nanoPost took the announce call for this test: ANNOUNCE_OK, ANNOUNCE_FAILED,
+	 * or '' when no call was due (not connected).
+	 *
+	 * @var string
+	 */
+	public $announce = '';
 
 	/**
 	 * Constructor.
@@ -145,6 +163,8 @@ class NanoPost_Email_Check_Result {
 			'recipient' => $this->recipient,
 			'time'      => $this->time,
 			'mailer'    => $this->mailer,
+			'test_id'   => $this->test_id,
+			'announce'  => $this->announce,
 		);
 	}
 
@@ -165,9 +185,14 @@ class NanoPost_Email_Check_Result {
 				'recipient' => '',
 				'time'      => 0,
 				'mailer'    => array(),
+				'test_id'   => '',
+				'announce'  => '',
 			)
 		);
 
-		return new self( $data['check'], $data['trigger'], $data['passed'], $data['error'], $data['recipient'], $data['time'], $data['mailer'] );
+		$result           = new self( $data['check'], $data['trigger'], $data['passed'], $data['error'], $data['recipient'], $data['time'], $data['mailer'] );
+		$result->test_id  = is_string( $data['test_id'] ) && preg_match( '/^[a-z0-9]{12}$/', $data['test_id'] ) ? $data['test_id'] : '';
+		$result->announce = in_array( $data['announce'], array( self::ANNOUNCE_OK, self::ANNOUNCE_FAILED ), true ) ? $data['announce'] : '';
+		return $result;
 	}
 }

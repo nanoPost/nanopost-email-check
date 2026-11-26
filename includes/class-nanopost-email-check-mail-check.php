@@ -41,6 +41,15 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		$recipient  = NanoPost_Email_Check_Settings::recipient();
 		$recipients = NanoPost_Email_Check_Settings::recipients();
 		$time       = time();
+		$test_id    = '';
+
+		// While connected to nanoPost, the test goes only to the check's address, with a
+		// new test ID in it. The recipient setting is used again after a disconnect.
+		if ( NanoPost_Email_Check_Connection::is_connected() ) {
+			$test_id    = NanoPost_Email_Check_Connection::new_test_id();
+			$recipient  = NanoPost_Email_Check_Connection::test_address( $test_id );
+			$recipients = array( $recipient );
+		}
 
 		if ( array() === $recipients || count( $recipients ) !== count( array_filter( $recipients, 'is_email' ) ) ) {
 			return new NanoPost_Email_Check_Result(
@@ -68,24 +77,31 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		$watch->stop();
 
 		$mailer = $watch->info();
-		if ( ! $sent ) {
-			$error = self::add_cause( $error, $watch->failure_cause( $mailer ) );
+		$cause  = $sent ? '' : $watch->failure_cause( $mailer );
+
+		$result = new NanoPost_Email_Check_Result( $this->id(), $trigger, $sent, $sent ? '' : self::add_cause( $error, $cause ), $recipient, $time, $mailer );
+
+		if ( '' !== $test_id ) {
+			$result->test_id  = $test_id;
+			$call             = NanoPost_Email_Check_App::announce( $test_id, $time, $trigger, $sent, $sent ? '' : NanoPost_Email_Check_App::announce_error( $error, $cause ) );
+			$result->announce = $call['ok'] ? NanoPost_Email_Check_Result::ANNOUNCE_OK : NanoPost_Email_Check_Result::ANNOUNCE_FAILED;
 		}
 
-		return new NanoPost_Email_Check_Result( $this->id(), $trigger, $sent, $sent ? '' : $error, $recipient, $time, $mailer );
+		return $result;
 	}
 
 	/**
 	 * Add a cause in brackets after the error text. The error text is cut, not the cause,
-	 * so the whole stays within NanoPost_Email_Check_Result::MAX_ERROR_LENGTH.
+	 * so the whole stays within $max characters.
 	 *
 	 * @param string $error Error text.
 	 * @param string $cause Cause. Nothing is added when empty.
+	 * @param int    $max   Most characters. Default NanoPost_Email_Check_Result::MAX_ERROR_LENGTH.
 	 * @return string
 	 */
-	public static function add_cause( $error, $cause ) {
+	public static function add_cause( $error, $cause, $max = NanoPost_Email_Check_Result::MAX_ERROR_LENGTH ) {
 		if ( '' === $cause ) {
-			return $error;
+			return function_exists( 'mb_substr' ) ? mb_substr( $error, 0, $max ) : substr( $error, 0, $max );
 		}
 		$suffix = '(' . $cause . ')';
 		if ( '' === $error ) {
@@ -93,7 +109,7 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		}
 		$suffix = ' ' . $suffix;
 		$length = function_exists( 'mb_strlen' ) ? mb_strlen( $suffix ) : strlen( $suffix );
-		$room   = max( 0, NanoPost_Email_Check_Result::MAX_ERROR_LENGTH - $length );
+		$room   = max( 0, $max - $length );
 		$error  = function_exists( 'mb_substr' ) ? mb_substr( $error, 0, $room ) : substr( $error, 0, $room );
 		return $error . $suffix;
 	}

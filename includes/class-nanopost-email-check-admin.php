@@ -23,6 +23,18 @@ class NanoPost_Email_Check_Admin {
 
 	const REVIEW_URL = 'https://wordpress.org/support/plugin/nanopost-email-check/reviews/#new-post';
 
+	const CONNECT_ACTION    = 'nanopost_email_check_connect';
+	const RETURN_ACTION     = 'nanopost_email_check_connect_return';
+	const DISCONNECT_ACTION = 'nanopost_email_check_disconnect';
+	const RESULT_ACTION     = 'nanopost_email_check_test_result';
+	const DISMISS_ENDED     = 'nanopost_email_check_dismiss_ended';
+
+	/**
+	 * Per-user transients: the connect state (60 minutes) and the test to show proof for.
+	 */
+	const STATE_PREFIX = 'nanopost_email_check_connect_state_';
+	const PROOF_PREFIX = 'nanopost_email_check_proof_';
+
 	/**
 	 * Register hooks.
 	 */
@@ -31,6 +43,11 @@ class NanoPost_Email_Check_Admin {
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
 		add_action( 'admin_post_' . self::SEND_ACTION, array( __CLASS__, 'handle_send' ) );
 		add_action( 'admin_post_' . self::TEST_ALERT_ACTION, array( __CLASS__, 'handle_test_alert' ) );
+		add_action( 'admin_post_' . self::CONNECT_ACTION, array( __CLASS__, 'handle_connect' ) );
+		add_action( 'admin_post_' . self::RETURN_ACTION, array( __CLASS__, 'handle_connect_return' ) );
+		add_action( 'admin_post_' . self::DISCONNECT_ACTION, array( __CLASS__, 'handle_disconnect' ) );
+		add_action( 'admin_post_' . self::DISMISS_ENDED, array( __CLASS__, 'handle_dismiss_ended' ) );
+		add_action( 'wp_ajax_' . self::RESULT_ACTION, array( __CLASS__, 'ajax_test_result' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( NANOPOST_EMAIL_CHECK_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -166,6 +183,11 @@ class NanoPost_Email_Check_Admin {
 			self::disabled( 'recipient' ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Fixed attribute text.
 		);
 		self::locked_note( 'recipient' );
+		if ( NanoPost_Email_Check_Connection::is_connected() ) {
+			echo '<p class="description nanopost-email-check-connected-note"><strong>';
+			esc_html_e( 'While this site is connected to nanoPost, test emails go only to nanoPost. This address is used again after you disconnect.', 'nanopost-email-check' );
+			echo '</strong></p>';
+		}
 		echo '<p class="description">';
 		printf(
 			/* translators: 1: maximum number of addresses, 2: site admin email address. */
@@ -256,6 +278,9 @@ class NanoPost_Email_Check_Admin {
 		$passed  = ! empty( $results );
 		foreach ( $results as $result ) {
 			$passed = $passed && $result->passed;
+			if ( '' !== $result->test_id ) {
+				set_transient( self::PROOF_PREFIX . get_current_user_id(), $result->test_id, 10 * MINUTE_IN_SECONDS );
+			}
 		}
 
 		set_transient( self::notice_key(), $passed ? 'passed' : 'failed', MINUTE_IN_SECONDS );
@@ -291,6 +316,137 @@ class NanoPost_Email_Check_Admin {
 	}
 
 	/**
+	 * Handle "Connect to nanoPost": make the state, then send the browser to the app,
+	 * where the owner logs in or signs up and approves the site.
+	 */
+	public static function handle_connect() {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to connect this site.', 'nanopost-email-check' ), 403 );
+		}
+		check_admin_referer( self::CONNECT_ACTION );
+
+		$state = wp_generate_password( 32, false, false );
+		set_transient( self::STATE_PREFIX . get_current_user_id(), $state, HOUR_IN_SECONDS );
+
+		$return = add_query_arg( 'action', self::RETURN_ACTION, admin_url( 'admin-post.php' ) );
+		wp_redirect( NanoPost_Email_Check_App::connect_url( $return, $state ) ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- The app is on another host by design; the URL is built from the API base.
+		exit;
+	}
+
+	/**
+	 * The app sends the browser back here with a one-time code and the state. Checks the
+	 * state (it stands in for a nonce), then exchanges the code for a token.
+	 */
+	public static function handle_connect_return() {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to connect this site.', 'nanopost-email-check' ), 403 );
+		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- The state is the one-time check; it is compared below.
+		$state = isset( $_GET['state'] ) ? sanitize_text_field( wp_unslash( $_GET['state'] ) ) : '';
+		$code  = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( $_GET['code'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+
+		$key    = self::STATE_PREFIX . get_current_user_id();
+		$stored = get_transient( $key );
+		delete_transient( $key );
+
+		if ( ! is_string( $stored ) || '' === $state || ! hash_equals( $stored, $state ) ) {
+			$outcome = array( 'outcome' => 'connect-state' );
+		} elseif ( '' === $code ) {
+			$outcome = array( 'outcome' => 'connect-cancelled' );
+		} else {
+			$call    = NanoPost_Email_Check_App::exchange( $code );
+			$outcome = $call['ok']
+				? array( 'outcome' => 'connected' )
+				: array(
+					'outcome' => 'invalid_code' === $call['error'] ? 'connect-invalid' : 'connect-failed',
+					'detail'  => '' !== $call['message'] ? $call['message'] : self::call_detail( $call ),
+				);
+		}
+
+		set_transient( self::notice_key(), $outcome, MINUTE_IN_SECONDS );
+		wp_safe_redirect( self::page_url() );
+		exit;
+	}
+
+	/**
+	 * Handle "Disconnect": tell the app (best effort) and delete the connection here.
+	 */
+	public static function handle_disconnect() {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to disconnect this site.', 'nanopost-email-check' ), 403 );
+		}
+		check_admin_referer( self::DISCONNECT_ACTION );
+
+		NanoPost_Email_Check_App::disconnect();
+		set_transient( self::notice_key(), 'disconnected', MINUTE_IN_SECONDS );
+		wp_safe_redirect( self::page_url() );
+		exit;
+	}
+
+	/**
+	 * Hide the "Reconnect" notice.
+	 */
+	public static function handle_dismiss_ended() {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You are not allowed to change this.', 'nanopost-email-check' ), 403 );
+		}
+		check_admin_referer( self::DISMISS_ENDED );
+		NanoPost_Email_Check_Connection::clear_ended_reason();
+		wp_safe_redirect( self::page_url() );
+		exit;
+	}
+
+	/**
+	 * Proof of arrival, asked by the browser. The plugin calls the app here, on the
+	 * server, so the token never reaches the browser.
+	 */
+	public static function ajax_test_result() {
+		check_ajax_referer( self::RESULT_ACTION );
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_send_json_error( array( 'error' => 'forbidden' ), 403 );
+		}
+
+		$test_id = isset( $_POST['test_id'] ) ? sanitize_key( wp_unslash( $_POST['test_id'] ) ) : '';
+		if ( ! preg_match( '/^[a-z0-9]{12}$/', $test_id ) ) {
+			wp_send_json_error( array( 'error' => 'invalid_test' ), 400 );
+		}
+
+		$call = NanoPost_Email_Check_App::test_result( $test_id );
+		if ( ! $call['ok'] ) {
+			wp_send_json_error(
+				array(
+					'error'     => $call['error'],
+					'check_url' => NanoPost_Email_Check_Connection::get()['check_url'],
+				)
+			);
+		}
+
+		$body   = $call['body'];
+		$fields = array();
+		foreach ( array( 'status', 'sent_at', 'arrived_at', 'spf', 'dkim', 'dmarc' ) as $key ) {
+			$fields[ $key ] = isset( $body[ $key ] ) && is_string( $body[ $key ] ) ? $body[ $key ] : null;
+		}
+		$fields['status']    = in_array( $fields['status'], array( 'waiting', 'arrived', 'missing', 'send_failed' ), true ) ? $fields['status'] : 'waiting';
+		$fields['check_url'] = isset( $body['check_url'] ) && is_string( $body['check_url'] ) ? esc_url_raw( $body['check_url'], array( 'https', 'http' ) ) : NanoPost_Email_Check_Connection::get()['check_url'];
+		wp_send_json_success( $fields );
+	}
+
+	/**
+	 * Short text for a failed call: the HTTP status, or the network error.
+	 *
+	 * @param array $call Call result.
+	 * @return string
+	 */
+	private static function call_detail( $call ) {
+		if ( 0 === $call['code'] ) {
+			return '' !== $call['message'] ? $call['message'] : $call['error'];
+		}
+		return 'HTTP ' . $call['code'];
+	}
+
+	/**
 	 * Per-user key for the one-time "Send test now" and "Send test alert" notice.
 	 *
 	 * @return string
@@ -320,6 +476,10 @@ class NanoPost_Email_Check_Admin {
 		// Section ids are stable hooks for styling, tests and documentation screenshots.
 		echo '<div id="nanopost-email-check-status">';
 		self::render_status();
+		echo '</div>';
+
+		echo '<div id="nanopost-email-check-connection">';
+		self::render_connection();
 		echo '</div>';
 
 		echo '<form id="nanopost-email-check-settings" method="post" action="' . esc_url( admin_url( 'options.php' ) ) . '">';
@@ -354,11 +514,25 @@ class NanoPost_Email_Check_Admin {
 	 * One-time notice after "Send test now" or "Send test alert".
 	 */
 	private static function render_send_notice() {
+		self::render_ended_notice();
+
 		$outcome = get_transient( self::notice_key() );
 		if ( false === $outcome ) {
 			return;
 		}
 		delete_transient( self::notice_key() );
+
+		$extra = '';
+		if ( is_array( $outcome ) ) {
+			$extra   = isset( $outcome['detail'] ) ? (string) $outcome['detail'] : '';
+			$outcome = isset( $outcome['outcome'] ) ? (string) $outcome['outcome'] : '';
+		}
+		$proof = '';
+		if ( in_array( $outcome, array( 'passed', 'failed' ), true ) ) {
+			$proof = get_transient( self::PROOF_PREFIX . get_current_user_id() );
+			delete_transient( self::PROOF_PREFIX . get_current_user_id() );
+			$proof = is_string( $proof ) && NanoPost_Email_Check_Connection::is_connected() ? $proof : '';
+		}
 
 		$delivery = NanoPost_Email_Check_Webhook::state()['last_delivery'];
 		$detail   = isset( $delivery['detail'] ) ? (string) $delivery['detail'] : '';
@@ -380,6 +554,28 @@ class NanoPost_Email_Check_Admin {
 		} elseif ( 'wait' === $outcome ) {
 			$class   = 'notice-warning';
 			$message = __( 'A test email was sent less than one minute ago. Wait one minute, then try again.', 'nanopost-email-check' );
+		} elseif ( 'connected' === $outcome ) {
+			$class   = 'notice-success';
+			$message = __( 'This site is connected to nanoPost. Test emails now go to nanoPost, and nanoPost alerts you when a test does not arrive.', 'nanopost-email-check' );
+		} elseif ( 'disconnected' === $outcome ) {
+			$class   = 'notice-success';
+			$message = __( 'This site is disconnected from nanoPost. Test emails go to the address in the settings again.', 'nanopost-email-check' );
+		} elseif ( 'connect-state' === $outcome ) {
+			$class   = 'notice-error';
+			$message = __( 'The connection was not made: the request expired or did not come from this screen. Click "Connect to nanoPost" again.', 'nanopost-email-check' );
+		} elseif ( 'connect-cancelled' === $outcome ) {
+			$class   = 'notice-warning';
+			$message = __( 'The connection was not made. Click "Connect to nanoPost" to try again.', 'nanopost-email-check' );
+		} elseif ( 'connect-invalid' === $outcome ) {
+			$class   = 'notice-error';
+			$message = __( 'The connection was not made: the approval code was wrong, used or expired. Click "Connect to nanoPost" again.', 'nanopost-email-check' );
+		} elseif ( 'connect-failed' === $outcome ) {
+			$class = 'notice-error';
+			/* translators: %s: error text or HTTP status. */
+			$message = sprintf( __( 'The connection was not made: could not reach nanoPost (%s). Try again later.', 'nanopost-email-check' ), $extra );
+		} elseif ( 'passed' === $outcome && '' !== $proof ) {
+			$class   = 'notice-success';
+			$message = __( 'WordPress accepted the test email for nanoPost. The proof of arrival shows below.', 'nanopost-email-check' );
 		} elseif ( 'passed' === $outcome ) {
 			$class   = 'notice-success';
 			$message = sprintf(
@@ -393,6 +589,130 @@ class NanoPost_Email_Check_Admin {
 		}
 
 		printf( '<div class="notice %1$s is-dismissible"><p>%2$s</p></div>', esc_attr( $class ), esc_html( $message ) );
+
+		if ( '' !== $proof ) {
+			self::render_proof( $proof );
+		}
+	}
+
+	/**
+	 * "Reconnect" notice after the connection ended without the owner's click.
+	 */
+	private static function render_ended_notice() {
+		$reason = NanoPost_Email_Check_Connection::ended_reason();
+		if ( '' === $reason || NanoPost_Email_Check_Connection::is_connected() ) {
+			return;
+		}
+		$message = NanoPost_Email_Check_Connection::ENDED_SITE_CHANGED === $reason
+			? __( 'The connection to nanoPost ended because the site address changed (for example a copied or moved site). Test emails go to the address in the settings again. Connect again to use nanoPost from this address.', 'nanopost-email-check' )
+			: __( 'nanoPost ended the connection to this site (it was removed in nanoPost, or moved to another site). Test emails go to the address in the settings again. Reconnect to use nanoPost.', 'nanopost-email-check' );
+
+		echo '<div class="notice notice-warning nanopost-email-check-reconnect"><p>' . esc_html( $message ) . '</p><p>';
+		self::connect_button( __( 'Reconnect', 'nanopost-email-check' ) );
+		echo ' <a href="' . esc_url( wp_nonce_url( add_query_arg( 'action', self::DISMISS_ENDED, admin_url( 'admin-post.php' ) ), self::DISMISS_ENDED ) ) . '">' . esc_html__( 'Dismiss', 'nanopost-email-check' ) . '</a>';
+		echo '</p></div>';
+	}
+
+	/**
+	 * Proof of arrival box. The browser asks the plugin every 5 seconds for up to 2
+	 * minutes (assets/proof.js); without JavaScript, the link to the check stays.
+	 *
+	 * @param string $test_id Test ID.
+	 */
+	private static function render_proof( $test_id ) {
+		$check_url = NanoPost_Email_Check_Connection::get()['check_url'];
+		echo '<div id="nanopost-email-check-proof" class="notice notice-info" data-test-id="' . esc_attr( $test_id ) . '">';
+		echo '<p><strong>' . esc_html__( 'Proof of arrival', 'nanopost-email-check' ) . '</strong></p>';
+		echo '<p class="nanopost-email-check-proof-status" aria-live="polite">' . esc_html__( 'Waiting for the test email to arrive at nanoPost ...', 'nanopost-email-check' ) . '</p>';
+		if ( '' !== $check_url ) {
+			echo '<p>' . self::help_link( $check_url, __( 'Open the check in nanoPost', 'nanopost-email-check' ) ) . ' &middot; '; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			echo self::help_link( NanoPost_Email_Check_Help::proof( NanoPost_Email_Check_Help::PLACE_PROOF ), __( 'About proof of arrival', 'nanopost-email-check' ) ) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+		}
+		echo '</div>';
+
+		wp_enqueue_script( 'nanopost-email-check-proof', plugins_url( 'assets/proof.js', NANOPOST_EMAIL_CHECK_FILE ), array(), NANOPOST_EMAIL_CHECK_VERSION, true );
+		wp_localize_script(
+			'nanopost-email-check-proof',
+			'nanopostEmailCheckProof',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( self::RESULT_ACTION ),
+				'action'  => self::RESULT_ACTION,
+				'text'    => array(
+					'waiting'     => __( 'Waiting for the test email to arrive at nanoPost ...', 'nanopost-email-check' ),
+					/* translators: %s: date and time the email arrived. */
+					'arrived'     => __( 'Arrived at nanoPost: %s.', 'nanopost-email-check' ),
+					/* translators: 1: SPF result, 2: DKIM result, 3: DMARC result, such as "pass". */
+					'auth'        => __( 'SPF: %1$s. DKIM: %2$s. DMARC: %3$s.', 'nanopost-email-check' ),
+					'missing'     => __( 'The test email did not arrive at nanoPost in time. nanoPost alerts you about it.', 'nanopost-email-check' ),
+					'send_failed' => __( 'The site could not send the test email. See the error in the log below.', 'nanopost-email-check' ),
+					'unreachable' => __( 'Could not reach nanoPost. Open the check in nanoPost to see the result.', 'nanopost-email-check' ),
+					'timeout'     => __( 'No result yet. The email can still arrive: open the check in nanoPost to see the result.', 'nanopost-email-check' ),
+					'none'        => __( 'none', 'nanopost-email-check' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * The nanoPost section: consent and "Connect", or the connection and "Disconnect".
+	 */
+	private static function render_connection() {
+		echo '<h2>' . esc_html__( 'nanoPost', 'nanopost-email-check' ) . '</h2>';
+
+		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
+			echo '<p>' . esc_html__( 'Optional. Connect this site to nanoPost (app.nanopo.st), a mail monitoring service. Each test email then goes to nanoPost, which shows here whether it arrived, with its SPF, DKIM and DMARC results, and alerts you when a test does not arrive.', 'nanopost-email-check' ) . '</p>';
+			echo '<p>' . esc_html__( 'When you connect, this site sends to nanoPost: the site address; the versions of this plugin, WordPress and PHP; the check interval; the webhook URL, if you set one; and for each test its ID, the time, what started it, and whether wp_mail() succeeded, with its error text, which can contain host names or email addresses. nanoPost also receives the test emails, and keeps the IP address of each call for 30 days. Nothing is sent before you connect.', 'nanopost-email-check' ) . '</p>';
+			echo '<p>';
+			self::connect_button( __( 'Connect to nanoPost', 'nanopost-email-check' ) );
+			echo ' ' . self::help_link( NanoPost_Email_Check_Help::TERMS_URL, __( 'Terms', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::PRIVACY_URL, __( 'Privacy', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::connect( NanoPost_Email_Check_Help::PLACE_CONNECTION ), __( 'How connecting works', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			echo '</p>';
+			return;
+		}
+
+		$connection = NanoPost_Email_Check_Connection::get();
+		echo '<p>';
+		echo esc_html(
+			sprintf(
+				/* translators: %s: the check's email address in nanoPost. */
+				__( 'Connected. Test emails go to nanoPost (%s).', 'nanopost-email-check' ),
+				$connection['address']
+			)
+		);
+		if ( '' !== $connection['check_url'] ) {
+			echo ' ' . self::help_link( $connection['check_url'], __( 'Open the check in nanoPost', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+		}
+		echo '</p>';
+
+		$too_old = NanoPost_Email_Check_Connection::too_old_message();
+		if ( '' !== $too_old ) {
+			echo '<div class="notice notice-error inline"><p>' . esc_html( $too_old ) . ' ' . esc_html__( 'Until then, the plugin does not call nanoPost. Test emails still go to nanoPost.', 'nanopost-email-check' ) . '</p></div>';
+		} elseif ( $connection['retry_until'] > time() ) {
+			/* translators: %s: date and time. */
+			echo '<p class="description">' . esc_html( sprintf( __( 'nanoPost asked the plugin to wait. Calls start again at %s.', 'nanopost-email-check' ), self::format_date( $connection['retry_until'] ) ) ) . '</p>';
+		}
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		echo '<input type="hidden" name="action" value="' . esc_attr( self::DISCONNECT_ACTION ) . '" />';
+		wp_nonce_field( self::DISCONNECT_ACTION );
+		submit_button( __( 'Disconnect', 'nanopost-email-check' ), 'secondary', 'submit', false );
+		echo ' <span class="description">' . esc_html__( 'Test emails then go to the address in the settings again. The check stays in nanoPost until you delete it there.', 'nanopost-email-check' ) . '</span>';
+		echo '</form>';
+	}
+
+	/**
+	 * A "Connect" button in its own small form.
+	 *
+	 * @param string $label Button text.
+	 */
+	private static function connect_button( $label ) {
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline;">';
+		echo '<input type="hidden" name="action" value="' . esc_attr( self::CONNECT_ACTION ) . '" />';
+		wp_nonce_field( self::CONNECT_ACTION );
+		submit_button( $label, 'primary', 'submit', false );
+		echo '</form>';
 	}
 
 	/**
@@ -466,11 +786,13 @@ class NanoPost_Email_Check_Admin {
 	private static function render_send_form() {
 		echo '<h2>' . esc_html__( 'Send test now', 'nanopost-email-check' ) . '</h2>';
 		echo '<p>' . esc_html(
-			sprintf(
-				/* translators: %s: recipient email address. */
-				__( 'Send one test email to %s now. Save any changed settings first.', 'nanopost-email-check' ),
-				NanoPost_Email_Check_Settings::recipient()
-			)
+			NanoPost_Email_Check_Connection::is_connected()
+				? __( 'Send one test email to nanoPost now, and see whether it arrives. Save any changed settings first.', 'nanopost-email-check' )
+				: sprintf(
+					/* translators: %s: recipient email address. */
+					__( 'Send one test email to %s now. Save any changed settings first.', 'nanopost-email-check' ),
+					NanoPost_Email_Check_Settings::recipient()
+				)
 		) . '</p>';
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::SEND_ACTION ) . '" />';
