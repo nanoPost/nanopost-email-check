@@ -61,8 +61,12 @@ class NanoPost_Email_Check_CLI {
 	 *     Success: WordPress accepted the test email for owner@example.com. Check that inbox (and the spam folder) to confirm it arrived.
 	 */
 	public function run() {
-		/* translators: %s: recipient email address. */
-		WP_CLI::log( sprintf( __( 'Sending a test email to %s ...', 'nanopost-email-check' ), NanoPost_Email_Check_Settings::recipient() ) );
+		if ( NanoPost_Email_Check_Connection::is_connected() ) {
+			WP_CLI::log( __( 'Sending a test email to nanoPost ...', 'nanopost-email-check' ) );
+		} else {
+			/* translators: %s: recipient email address. */
+			WP_CLI::log( sprintf( __( 'Sending a test email to %s ...', 'nanopost-email-check' ), NanoPost_Email_Check_Settings::recipient() ) );
+		}
 		$results = NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_CLI );
 
 		if ( empty( $results ) ) {

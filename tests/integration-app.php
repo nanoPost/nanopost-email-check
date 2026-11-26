@@ -642,6 +642,7 @@ np_app_connect();
 add_filter( 'pre_wp_mail', '__return_true' );
 $np_out = np_cli( 'run' );
 np_assert( 0 === $np_out->return_code && false !== strpos( $np_out->stdout, 'accepted the test email for nanoPost (test ' ) && false !== strpos( $np_out->stdout, 'https://app.example/checks/01JD' ), 'wp email-check run while connected: names nanoPost, the test ID and the check URL', $np_out );
+np_assert( false !== strpos( $np_out->stdout, 'Sending a test email to nanoPost ...' ) && false === strpos( $np_out->stdout, 'owner@' ), 'wp email-check run while connected: does not name the recipient setting', $np_out );
 np_app_answer( 503 );
 $np_out = np_cli( 'run' );
 np_assert( 0 === $np_out->return_code && false !== strpos( $np_out->stderr, 'could not tell nanoPost' ), 'wp email-check run: a warning when the announce call failed', $np_out );
