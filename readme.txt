@@ -48,7 +48,8 @@ SMTP and email log plugins send and record the site's real mail, and some of the
 * **Settings in code:** set the recipient, interval and webhook URL in `wp-config.php`. The plugin screen shows them read-only.
 * **Mailer shown:** each result records how the site sends: SMTP server and port, PHP `mail()`, or another plugin, and which plugin set it up. When PHP `mail()` fails because the sendmail program is missing, the error says so.
 * **Multisite:** each site runs its own checks, with its own settings, log and notices.
-* **No outside requests** unless you set a webhook. Nothing is sent to nanoPost.
+* **Optional proof of arrival:** connect the site to nanoPost (opt-in) to see whether each test email arrived, with its SPF, DKIM and DMARC results, and to get an alert from nanoPost when a test does not arrive.
+* **No outside requests** unless you set a webhook or connect to nanoPost.
 
 = What a pass means =
 
@@ -94,7 +95,11 @@ No. It sends test emails only to the address or addresses you set (at most 3).
 
 = Does the plugin send data to nanoPost? =
 
-No. See "External services" below.
+Only if you connect the site to nanoPost on the plugin screen. Without a connection, nothing is sent to nanoPost. See "External services" below for what a connected site sends.
+
+= What does connecting to nanoPost add? =
+
+A connected site sends each test email to nanoPost instead of the recipient you set. nanoPost shows whether the email arrived, with its SPF, DKIM and DMARC results ("Send test now" shows this proof of arrival on the plugin screen), and alerts you when a test does not arrive. Connecting is optional, and the plugin works in full without it. Disconnect on the plugin screen at any time: test emails then go to your recipient again.
 
 = The notice says the checks have stopped. What does that mean? =
 
@@ -135,7 +140,24 @@ Deleting the plugin removes its settings, the log, the webhook state, the dismis
 
 == External services ==
 
-The plugin makes no outside requests unless you set a webhook URL.
+The plugin makes no outside requests unless you set a webhook URL or connect the site to nanoPost.
+
+= nanoPost app (optional, after you connect) =
+
+nanoPost (app.nanopo.st) is a mail monitoring service run by the plugin's authors. The plugin calls it only after you click "Connect to nanoPost" on the plugin screen and approve the site in your browser. Until then, nothing is sent. When you disconnect, or delete the plugin, the plugin tells nanoPost and stops all calls.
+
+While connected, the site sends:
+
+* when you connect: a one-time approval code and the site address;
+* the site address, the versions of the plugin, WordPress and PHP, the check interval, and the webhook URL if you set one: after you connect, and again when one of them changes;
+* for each test: a test ID, the time it was sent, what started it (the schedule, a user or WP-CLI), whether `wp_mail()` succeeded, and its error text (at most 500 characters; it can contain host names or email addresses);
+* when you press "Send test now": a request for that test's result, while the plugin screen is open (at most 2 minutes);
+* the plugin version in every call.
+
+The test emails go to nanoPost's address for the site's check instead of the recipient you set. nanoPost receives each test email and its headers, as for any email. nanoPost keeps the IP address of each call for 30 days. The plugin sends no user data, no other email, and no other settings.
+
+* Terms of use: https://nanopo.st/terms/#the-app-appnanopost
+* Privacy policy: https://nanopo.st/privacy/#the-app-appnanopost
 
 = Webhook (optional) =
 
