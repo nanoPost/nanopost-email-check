@@ -231,6 +231,7 @@ class NanoPost_Email_Check_CLI {
 				'passed'    => $latest->passed,
 				'error'     => $latest->error_message(),
 				'recipient' => $latest->recipient,
+				'test_id'   => '' === $latest->test_id ? null : $latest->test_id,
 			),
 			'failed_check'  => null === $failed ? null : array(
 				'check' => $failed->check,
@@ -253,6 +254,46 @@ class NanoPost_Email_Check_CLI {
 					'detail' => isset( $delivery['detail'] ) ? (string) $delivery['detail'] : '',
 					'test'   => ! empty( $delivery['test'] ),
 				),
+			),
+			'nanopost'      => self::nanopost_data(),
+		);
+	}
+
+	/**
+	 * The connection to the nanoPost app, as data. Never holds the token.
+	 *
+	 * @return array
+	 */
+	private static function nanopost_data() {
+		$connected = NanoPost_Email_Check_Connection::is_connected();
+		$conn      = NanoPost_Email_Check_Connection::get();
+		$too_old   = $connected ? NanoPost_Email_Check_Connection::too_old_message() : '';
+		$failed    = NanoPost_Email_Check_App::failed_calls();
+		$last      = $failed ? end( $failed ) : null;
+
+		if ( ! $connected ) {
+			$calls = 'not_connected';
+		} elseif ( '' !== $too_old ) {
+			$calls = 'stopped_too_old';
+		} elseif ( $conn['retry_until'] > time() ) {
+			$calls = 'waiting';
+		} else {
+			$calls = 'on';
+		}
+
+		return array(
+			'connected'        => $connected,
+			'address'          => $connected ? $conn['address'] : null,
+			'check_url'        => $connected && '' !== $conn['check_url'] ? $conn['check_url'] : null,
+			'calls'            => $calls,
+			'message'          => '' !== $too_old ? $too_old : null,
+			'retry_until'      => 'waiting' === $calls ? self::iso_time( $conn['retry_until'] ) : null,
+			'ended'            => $connected || '' === NanoPost_Email_Check_Connection::ended_reason() ? null : NanoPost_Email_Check_Connection::ended_reason(),
+			'last_failed_call' => null === $last ? null : array(
+				'time'  => self::iso_time( (int) $last['time'] ),
+				'call'  => (string) $last['call'],
+				'code'  => (int) $last['code'],
+				'error' => (string) $last['error'],
 			),
 		);
 	}
@@ -439,6 +480,29 @@ class NanoPost_Email_Check_CLI {
 				: vsprintf( __( 'Last webhook message: %1$s, %2$s (%3$s).', 'nanopost-email-check' ), $args );
 		}
 		$add( __( 'Webhook', 'nanopost-email-check' ), $webhook );
+
+		$np = $data['nanopost'];
+		if ( ! $np['connected'] ) {
+			$text = __( 'Not connected. Connect on the plugin screen (Tools > Email Check).', 'nanopost-email-check' );
+			if ( null !== $np['ended'] ) {
+				$text .= ' ' . ( NanoPost_Email_Check_Connection::ENDED_SITE_CHANGED === $np['ended']
+					? __( 'The last connection ended because the site address changed.', 'nanopost-email-check' )
+					: __( 'The last connection was ended in nanoPost.', 'nanopost-email-check' ) );
+			}
+		} else {
+			/* translators: %s: the check's email address in nanoPost. */
+			$text = sprintf( __( 'Connected. Test emails go to %s.', 'nanopost-email-check' ), $np['address'] );
+			if ( 'stopped_too_old' === $np['calls'] ) {
+				$text .= ' ' . $np['message'];
+			} elseif ( 'waiting' === $np['calls'] ) {
+				/* translators: %s: date and time. */
+				$text .= ' ' . sprintf( __( 'Calls wait until %s.', 'nanopost-email-check' ), NanoPost_Email_Check_Admin::format_time( self::unix_time( $np['retry_until'] ) ) );
+			}
+		}
+		$add( __( 'nanoPost', 'nanopost-email-check' ), $text );
+		if ( null !== $np['check_url'] ) {
+			$add( __( 'Check in nanoPost', 'nanopost-email-check' ), $np['check_url'] );
+		}
 
 		return $rows;
 	}

@@ -620,6 +620,22 @@ $_GET = array();
 np_nonce( null );
 
 // ---------------------------------------------------------------------------------------
+np_section( 'App: WP-CLI status' );
+np_reset();
+NanoPost_Email_Check_Scheduler::ensure_scheduled();
+$np_data = NanoPost_Email_Check_CLI::status_data();
+np_assert( false === $np_data['nanopost']['connected'] && 'not_connected' === $np_data['nanopost']['calls'], 'status: not connected', $np_data['nanopost'] );
+np_app_connect();
+$np_data = NanoPost_Email_Check_CLI::status_data();
+np_assert( true === $np_data['nanopost']['connected'] && 'on' === $np_data['nanopost']['calls'] && 'https://app.example/checks/01JD' === $np_data['nanopost']['check_url'], 'status: connected, calls on, check URL', $np_data['nanopost'] );
+np_assert( false === strpos( wp_json_encode( $np_data ), 'tok-123' ), 'status: never shows the token' );
+NanoPost_Email_Check_Connection::wait( 300 );
+np_assert( 'waiting' === NanoPost_Email_Check_CLI::status_data()['nanopost']['calls'], 'status: waiting after a 429' );
+$np_rows = wp_list_pluck( NanoPost_Email_Check_CLI::status_rows( NanoPost_Email_Check_CLI::status_data() ), 'value', 'field' );
+np_assert( isset( $np_rows['nanoPost'] ) && false !== strpos( $np_rows['nanoPost'], 'Calls wait until' ), 'status table: the nanoPost row', $np_rows );
+np_reset();
+
+// ---------------------------------------------------------------------------------------
 np_section( 'App: uninstall tells nanoPost' );
 np_reset();
 np_app_connect();
