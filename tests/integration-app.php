@@ -272,6 +272,7 @@ remove_filter( 'pre_wp_mail', '__return_true' );
 np_section( 'App: failure rules' );
 np_reset();
 np_app_connect();
+update_option( NanoPost_Email_Check_Settings::OPTION, array( 'recipient' => 'owner@example.com' ) );
 add_filter( 'pre_wp_mail', '__return_true' );
 
 // 429: wait for Retry-After, then call again.
