@@ -76,6 +76,22 @@ class NanoPost_Email_Check_CLI {
 			}
 		}
 
+		if ( empty( $failed ) && '' !== $results[0]->test_id ) {
+			$check_url = NanoPost_Email_Check_Connection::get()['check_url'];
+			WP_CLI::success(
+				sprintf(
+					/* translators: 1: test ID, 2: URL of the check in nanoPost. */
+					__( 'WordPress accepted the test email for nanoPost (test %1$s). See whether it arrived: %2$s', 'nanopost-email-check' ),
+					$results[0]->test_id,
+					'' !== $check_url ? $check_url : __( 'the check page in nanoPost', 'nanopost-email-check' )
+				)
+			);
+			if ( NanoPost_Email_Check_Result::ANNOUNCE_OK !== $results[0]->announce ) {
+				WP_CLI::warning( __( 'The plugin could not tell nanoPost about this test. nanoPost still records the email if it arrives.', 'nanopost-email-check' ) );
+			}
+			return;
+		}
+
 		if ( empty( $failed ) ) {
 			WP_CLI::success(
 				sprintf(

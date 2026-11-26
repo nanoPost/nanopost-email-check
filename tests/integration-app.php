@@ -135,7 +135,7 @@ np_app_take();
 // The dev site may point at the staging app with NANOPOST_EMAIL_CHECK_APP_URL.
 $np_app_base = defined( 'NANOPOST_EMAIL_CHECK_APP_URL' ) ? untrailingslashit( NANOPOST_EMAIL_CHECK_APP_URL ) : 'https://app.nanopo.st/api/v1';
 $np_app_page = preg_replace( '#/api/v1$#', '', $np_app_base ) . '/connect?';
-np_assert( $np_app_base === NanoPost_Email_Check_App::base_url(), 'base URL: the production API, or the constant', NanoPost_Email_Check_App::base_url() );
+np_assert( NanoPost_Email_Check_App::base_url() === $np_app_base, 'base URL: the production API, or the constant', NanoPost_Email_Check_App::base_url() );
 np_assert( ! NanoPost_Email_Check_Connection::is_connected() && ! NanoPost_Email_Check_Connection::calls_allowed(), 'no connection, no calls' );
 $np = NanoPost_Email_Check_App::announce( 'abcdefabcdef', time(), 'manual', true, '' );
 np_assert( ! $np['ok'] && 'not_connected' === $np['error'] && array() === np_app_take(), 'announce without a connection makes no call', $np );
@@ -636,6 +636,16 @@ NanoPost_Email_Check_Connection::wait( 300 );
 np_assert( 'waiting' === NanoPost_Email_Check_CLI::status_data()['nanopost']['calls'], 'status: waiting after a 429' );
 $np_rows = wp_list_pluck( NanoPost_Email_Check_CLI::status_rows( NanoPost_Email_Check_CLI::status_data() ), 'value', 'field' );
 np_assert( isset( $np_rows['nanoPost'] ) && false !== strpos( $np_rows['nanoPost'], 'Calls wait until' ), 'status table: the nanoPost row', $np_rows );
+
+np_app_connect();
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_out = np_cli( 'run' );
+np_assert( 0 === $np_out->return_code && false !== strpos( $np_out->stdout, 'accepted the test email for nanoPost (test ' ) && false !== strpos( $np_out->stdout, 'https://app.example/checks/01JD' ), 'wp email-check run while connected: names nanoPost, the test ID and the check URL', $np_out );
+np_app_answer( 503 );
+$np_out = np_cli( 'run' );
+np_assert( 0 === $np_out->return_code && false !== strpos( $np_out->stderr, 'could not tell nanoPost' ), 'wp email-check run: a warning when the announce call failed', $np_out );
+remove_filter( 'pre_wp_mail', '__return_true' );
+np_app_take();
 np_reset();
 
 // ---------------------------------------------------------------------------------------
