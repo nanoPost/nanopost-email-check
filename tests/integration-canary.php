@@ -330,15 +330,16 @@ $np_set(
 		'last_arrival' => array(
 			'received_at' => gmdate( 'Y-m-d\TH:i:s\Z', time() - 60 ),
 			'test_id'     => 'eeeeeeeeeeee',
-			'spf'         => 'fail',
+			'spf'         => 'softfail',
 			'dkim'        => 'none',
 			'dmarc'       => 'fail',
 		),
 	)
 );
 $np_html = np_notices();
-np_assert( false !== strpos( $np_html, 'Email Canary: the test email arrived, but did not pass SPF, DMARC.' ), 'did not pass: one notice naming each method that failed', $np_html );
+np_assert( false !== strpos( $np_html, 'Email Canary: the test email arrived, but did not pass SPF and DMARC.' ), 'did not pass: one notice naming each method that failed', $np_html );
 np_assert( false === strpos( $np_html, 'DKIM' ), '"none" (DKIM not signed) is not a problem', $np_html );
+np_assert( 'SPF, DKIM and DMARC' === NanoPost_Email_Check_Canary::name_list( array( 'SPF', 'DKIM', 'DMARC' ) ) && 'DMARC' === NanoPost_Email_Check_Canary::name_list( array( 'DMARC' ) ), 'names as the emails write them' );
 $np_set( $np_missing );
 $np_p = NanoPost_Email_Check_Canary::problems( NanoPost_Email_Check_Canary::block() );
 np_assert( 1 === count( $np_p ) && 'missing' === $np_p[0]['type'], 'all well with the last arrival, the next one missing: one problem' );

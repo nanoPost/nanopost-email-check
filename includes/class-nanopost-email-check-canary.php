@@ -48,10 +48,10 @@ class NanoPost_Email_Check_Canary {
 	const SCREEN_LOCK     = 'nanopost_email_check_canary_lock';
 
 	/**
-	 * SPF, DKIM and DMARC results that count as a problem. "none", "neutral" and
-	 * "softfail" show as a warning only.
+	 * SPF, DKIM and DMARC results that count as "did not pass", as Email Canary counts
+	 * them in its emails. "none" and "neutral" show as a warning only.
 	 */
-	const AUTH_PROBLEMS = array( 'fail', 'permerror', 'temperror' );
+	const AUTH_PROBLEMS = array( 'fail', 'softfail', 'permerror', 'temperror' );
 
 	/**
 	 * Values of "arrival" the plugin knows. Others show as "Open nanoPost to see".
@@ -665,7 +665,23 @@ class NanoPost_Email_Check_Canary {
 			}
 			return __( 'Email Canary: the test email did not arrive.', 'nanopost-email-check' );
 		}
-		/* translators: %s: names such as "DMARC" or "SPF, DMARC". */
-		return sprintf( __( 'Email Canary: the test email arrived, but did not pass %s.', 'nanopost-email-check' ), implode( ', ', $problem['failing'] ) );
+		/* translators: %s: names such as "DMARC", "SPF and DMARC" or "SPF, DKIM and DMARC". */
+		return sprintf( __( 'Email Canary: the test email arrived, but did not pass %s.', 'nanopost-email-check' ), self::name_list( $problem['failing'] ) );
+	}
+
+	/**
+	 * "A", "A and B" or "A, B and C", as the Email Canary emails write it.
+	 *
+	 * @param string[] $names Names.
+	 * @return string
+	 */
+	public static function name_list( $names ) {
+		$names = array_values( $names );
+		if ( count( $names ) < 2 ) {
+			return implode( '', $names );
+		}
+		$last = array_pop( $names );
+		/* translators: 1: names separated by commas, 2: the last name. */
+		return sprintf( __( '%1$s and %2$s', 'nanopost-email-check' ), implode( ', ', $names ), $last );
 	}
 }
