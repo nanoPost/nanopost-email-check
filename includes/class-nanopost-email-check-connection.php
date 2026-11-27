@@ -142,6 +142,17 @@ class NanoPost_Email_Check_Connection {
 	}
 
 	/**
+	 * Store the link to the site's page in nanoPost, when it changed.
+	 *
+	 * @param string $url URL.
+	 */
+	public static function set_check_url( $url ) {
+		if ( self::get()['check_url'] !== $url ) {
+			self::update( array( 'check_url' => (string) $url ) );
+		}
+	}
+
+	/**
 	 * The alert address the owner last typed, or ''.
 	 *
 	 * @return string

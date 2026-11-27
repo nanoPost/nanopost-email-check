@@ -118,6 +118,10 @@ class NanoPost_Email_Check_Canary {
 		if ( null !== $block['last_test'] ) {
 			self::record_test( $block['last_test'] );
 		}
+		// After a lost token, the confirm joins the site's old canary: its page changes.
+		if ( '' !== $block['check_url'] ) {
+			NanoPost_Email_Check_Connection::set_check_url( $block['check_url'] );
+		}
 		return true;
 	}
 

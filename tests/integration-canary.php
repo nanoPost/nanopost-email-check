@@ -129,8 +129,18 @@ np_assert( '' === $np_t['help_url'], 'a help link over plain http is dropped' );
 
 NanoPost_Email_Check_Canary::take( array( 'check' => np_block( array( 'observed_at' => gmdate( 'Y-m-d\TH:i:s\Z', time() - 600 ) ) ) ) );
 np_assert( 'snoozing' === NanoPost_Email_Check_Canary::block()['watching'], 'an older block (answers in the wrong order) does not replace a newer one' );
-NanoPost_Email_Check_Canary::take( array( 'check' => np_block( array( 'observed_at' => gmdate( 'Y-m-d\TH:i:s\Z', time() + 5 ) ) ) ) );
+NanoPost_Email_Check_Canary::take(
+	array(
+		'check' => np_block(
+			array(
+				'observed_at' => gmdate( 'Y-m-d\TH:i:s\Z', time() + 5 ),
+				'check_url'   => 'https://app.example/canaries/OLD',
+			)
+		),
+	)
+);
 np_assert( 'on' === NanoPost_Email_Check_Canary::block()['watching'], 'a newer block replaces it' );
+np_assert( 'https://app.example/canaries/OLD' === NanoPost_Email_Check_Connection::get()['check_url'], 'the stored link follows the block (a lost token joins the old canary)' );
 
 wp_schedule_single_event( time() + 900, NanoPost_Email_Check_Canary::FETCH_HOOK, array( 'cccccccccccc', 1 ) );
 NanoPost_Email_Check_Connection::end();
