@@ -497,7 +497,7 @@ wp_set_current_user( $np_admin_id );
 $np_x = np_xpath( np_render_screen() );
 np_assert( 1 === $np_x->query( '//div[@id="nanopost-email-check-connection"]//input[@name="action" and @value="nanopost_email_check_connect"]' )->length, 'not connected: a Connect form' );
 $np_text = $np_x->query( '//div[@id="nanopost-email-check-connection"]' )->item( 0 )->textContent;
-foreach ( array( 'site address', 'plugin, WordPress and PHP', 'check interval', 'webhook URL', 'ID, the time, what started it', 'wp_mail() succeeded', 'error text', '30 days', 'Nothing is sent before you connect' ) as $np_part ) {
+foreach ( array( 'site address', 'address of its admin area', 'plugin, WordPress and PHP', 'check interval', 'webhook URL', 'ID, the time, what started it', 'wp_mail() succeeded', 'error text', '30 days', 'Nothing is sent before you connect' ) as $np_part ) {
 	np_assert( false !== strpos( $np_text, $np_part ), 'consent text names: ' . $np_part );
 }
 np_assert( 1 === $np_x->query( '//a[@href="' . NanoPost_Email_Check_Help::TERMS_URL . '"]' )->length && 1 === $np_x->query( '//a[@href="' . NanoPost_Email_Check_Help::PRIVACY_URL . '"]' )->length, 'consent: terms and privacy links' );

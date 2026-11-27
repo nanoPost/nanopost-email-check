@@ -670,7 +670,7 @@ class NanoPost_Email_Check_Admin {
 
 		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
 			echo '<p>' . esc_html__( 'Optional. Connect this site to nanoPost (app.nanopo.st), a mail monitoring service. Each test email then goes to nanoPost, which shows here whether it arrived, with its SPF, DKIM and DMARC results, and alerts you when a test does not arrive.', 'nanopost-email-check' ) . '</p>';
-			echo '<p>' . esc_html__( 'When you connect, this site sends to nanoPost: the site address; the versions of this plugin, WordPress and PHP; the check interval; the webhook URL, if you set one; and for each test its ID, the time, what started it, and whether wp_mail() succeeded, with its error text, which can contain host names or email addresses. nanoPost also receives the test emails, and keeps the IP address of each call for 30 days. Nothing is sent before you connect.', 'nanopost-email-check' ) . '</p>';
+			echo '<p>' . esc_html__( 'When you connect, this site sends to nanoPost: the site address and the address of its admin area; the versions of this plugin, WordPress and PHP; the check interval; the webhook URL, if you set one; and for each test its ID, the time, what started it, and whether wp_mail() succeeded, with its error text, which can contain host names or email addresses. nanoPost also receives the test emails, and keeps the IP address of each call for 30 days. Nothing is sent before you connect.', 'nanopost-email-check' ) . '</p>';
 			echo '<p>';
 			self::connect_button( __( 'Connect to nanoPost', 'nanopost-email-check' ) );
 			echo ' ' . self::help_link( NanoPost_Email_Check_Help::TERMS_URL, __( 'Terms', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().

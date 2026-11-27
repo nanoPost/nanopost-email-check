@@ -148,7 +148,7 @@ nanoPost (app.nanopo.st) is a mail monitoring service run by the plugin's author
 
 While connected, the site sends:
 
-* when you connect: a one-time approval code and the site address;
+* when you connect: a one-time approval code, the site address, and the address of its admin area, so nanoPost can send your browser back after you approve;
 * the site address, the versions of the plugin, WordPress and PHP, the check interval, and the webhook URL if you set one: after you connect, and again when one of them changes;
 * for each test: a test ID, the time it was sent, what started it (the schedule, a user or WP-CLI), whether `wp_mail()` succeeded, and its error text (at most 500 characters; it can contain host names or email addresses);
 * when you press "Send test now": a request for that test's result, while the plugin screen is open (at most 2 minutes);
