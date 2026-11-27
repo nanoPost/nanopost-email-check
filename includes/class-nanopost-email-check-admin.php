@@ -859,16 +859,16 @@ class NanoPost_Email_Check_Admin {
 			return;
 		}
 
-		// "Cannot tell" is about arrivals: it does not hide a stop or a missing confirm.
-		if ( 'on' === $block['watching'] && NanoPost_Email_Check_Canary::cannot_tell( $block ) ) {
-			echo '<p class="nanopost-email-check-state"><span aria-hidden="true">?</span> <strong>' . esc_html__( 'Email Canary cannot tell now.', 'nanopost-email-check' ) . '</strong> ' . esc_html__( 'Email Check sends your test emails as usual.', 'nanopost-email-check' ) . '</p>';
-			self::render_canary_actions( true );
-			return;
-		}
-
+		// "Cannot tell" is about arrivals: it takes the place of "on", and does not hide a
+		// stop or a missing confirm. The rest of the area stays, so the owner can still
+		// change where alerts go.
 		$address = self::alert_address( $block );
 		switch ( $block['watching'] ) {
 			case 'on':
+				if ( NanoPost_Email_Check_Canary::cannot_tell( $block ) ) {
+					echo '<p class="nanopost-email-check-state"><span aria-hidden="true">?</span> <strong>' . esc_html__( 'Email Canary cannot tell now.', 'nanopost-email-check' ) . '</strong> ' . esc_html__( 'Email Check sends your test emails as usual.', 'nanopost-email-check' ) . '</p>';
+					break;
+				}
 				echo '<p class="nanopost-email-check-state nanopost-email-check-state-on"><span aria-hidden="true">&#9679;</span> <strong>' . esc_html__( 'Email Canary is on', 'nanopost-email-check' ) . '</strong></p>';
 				break;
 			case 'unconfirmed':
