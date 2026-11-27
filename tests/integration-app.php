@@ -528,6 +528,27 @@ np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page
 np_assert( array( 'outcome' => 'connect-state' ) === get_transient( 'nanopost_email_check_sent_' . $np_admin_id ), 'return: the state notice' );
 np_assert( false === get_transient( NanoPost_Email_Check_Admin::STATE_PREFIX . $np_admin_id ), 'return: the state is used up, also on a mismatch' );
 
+// Cancel in nanoPost: the right state, error=cancelled, no code: no call, no notice.
+delete_transient( 'nanopost_email_check_sent_' . $np_admin_id );
+np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::CONNECT_ACTION ) );
+$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) );
+parse_str( (string) wp_parse_url( substr( $np_out, 9 ), PHP_URL_QUERY ), $np_q );
+$_GET   = array(
+	'action' => 'nanopost_email_check_connect_return',
+	'error'  => 'cancelled',
+	'state'  => $np_q['state'],
+);
+$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) );
+np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ) && array() === np_app_take() && ! NanoPost_Email_Check_Connection::is_connected(), 'cancel: back to the screen, no call, not connected', $np_out );
+np_assert( false === get_transient( 'nanopost_email_check_sent_' . $np_admin_id ), 'cancel: no notice, as if nothing happened' );
+np_assert( false === get_transient( NanoPost_Email_Check_Admin::STATE_PREFIX . $np_admin_id ), 'cancel: the state is used up' );
+$_GET = array(
+	'error' => 'cancelled',
+	'state' => 'stale',
+);
+np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) );
+np_assert( array( 'outcome' => 'connect-state' ) === get_transient( 'nanopost_email_check_sent_' . $np_admin_id ), 'cancel with a bad state: the usual "request expired" notice' );
+
 // Return with the right state.
 np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::CONNECT_ACTION ) );
 $np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) );

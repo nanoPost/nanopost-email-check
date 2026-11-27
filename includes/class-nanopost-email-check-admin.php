@@ -345,6 +345,7 @@ class NanoPost_Email_Check_Admin {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- The state is the one-time check; it is compared below.
 		$state = isset( $_GET['state'] ) ? sanitize_text_field( wp_unslash( $_GET['state'] ) ) : '';
 		$code  = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( $_GET['code'] ) ) : '';
+		$error = isset( $_GET['error'] ) ? sanitize_key( wp_unslash( $_GET['error'] ) ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$key    = self::STATE_PREFIX . get_current_user_id();
@@ -353,6 +354,9 @@ class NanoPost_Email_Check_Admin {
 
 		if ( ! is_string( $stored ) || '' === $state || ! hash_equals( $stored, $state ) ) {
 			$outcome = array( 'outcome' => 'connect-state' );
+		} elseif ( '' === $code && 'cancelled' === $error ) {
+			// The owner pressed Cancel in nanoPost: back to the screen, as if nothing happened.
+			$outcome = null;
 		} elseif ( '' === $code ) {
 			$outcome = array( 'outcome' => 'connect-cancelled' );
 		} else {
@@ -365,7 +369,9 @@ class NanoPost_Email_Check_Admin {
 				);
 		}
 
-		set_transient( self::notice_key(), $outcome, MINUTE_IN_SECONDS );
+		if ( null !== $outcome ) {
+			set_transient( self::notice_key(), $outcome, MINUTE_IN_SECONDS );
+		}
 		wp_safe_redirect( self::page_url() );
 		exit;
 	}
@@ -700,7 +706,7 @@ class NanoPost_Email_Check_Admin {
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::DISCONNECT_ACTION ) . '" />';
 		wp_nonce_field( self::DISCONNECT_ACTION );
 		submit_button( __( 'Disconnect', 'nanopost-email-check' ), 'secondary', 'submit', false );
-		echo ' <span class="description">' . esc_html__( 'Test emails then go to the address in the settings again. The check stays in nanoPost until you delete it there.', 'nanopost-email-check' ) . '</span>';
+		echo ' <span class="description">' . esc_html__( 'Test emails then go to the address in the settings again. nanoPost stops the check and deletes it after 30 days, unless this site connects again.', 'nanopost-email-check' ) . '</span>';
 		echo '</form>';
 	}
 
