@@ -49,6 +49,22 @@ class NanoPost_Email_Check_Webhook {
 
 		$previous = isset( $state['last_status'][ $result->check ] ) ? $state['last_status'][ $result->check ] : '';
 
+		// Connected to nanoPost, and nanoPost took the announce call: nanoPost alerts on
+		// this failure and sends the recovery, so the plugin stays quiet and forgets its
+		// own state. A recovery after the plugin's own fallback alert (sent when the call
+		// failed, which nanoPost never saw) still goes out below.
+		// The same when nanoPost answered 401: the connection had ended (for example the
+		// owner disconnected the site in nanoPost, which then refuses mail to its address).
+		// The screen shows "Reconnect", and the next test goes to the recipient setting,
+		// where a real mail problem alerts as usual.
+		if ( in_array( $result->announce, array( NanoPost_Email_Check_Result::ANNOUNCE_OK, NanoPost_Email_Check_Result::ANNOUNCE_ENDED ), true ) && ! $result->passed ) {
+			if ( '' !== $previous ) {
+				unset( $state['last_status'][ $result->check ] );
+				update_option( self::STATE_OPTION, $state, false );
+			}
+			return;
+		}
+
 		if ( $result->passed && 'fail' !== $previous ) {
 			// Passing, and nothing to recover from: stay quiet.
 			return;
@@ -64,6 +80,21 @@ class NanoPost_Email_Check_Webhook {
 		}
 		$state['last_delivery'] = $delivery;
 		update_option( self::STATE_OPTION, $state, false );
+	}
+
+	/**
+	 * Forget the delivered status of one check, so no recovery message follows for a
+	 * failure the other side alerted on. Used when the site connects to or disconnects
+	 * from nanoPost.
+	 *
+	 * @param string $check Check id.
+	 */
+	public static function reset_check( $check ) {
+		$stored = get_option( self::STATE_OPTION, array() );
+		if ( is_array( $stored ) && isset( $stored['last_status'][ $check ] ) ) {
+			unset( $stored['last_status'][ $check ] );
+			update_option( self::STATE_OPTION, $stored, false );
+		}
 	}
 
 	/**

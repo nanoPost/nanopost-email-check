@@ -102,7 +102,11 @@ function np_reset() {
 	delete_option( NanoPost_Email_Check_Log::OPTION );
 	delete_option( NanoPost_Email_Check_Webhook::STATE_OPTION );
 	delete_option( NanoPost_Email_Check_Scheduler::STATE_OPTION );
+	delete_option( NanoPost_Email_Check_Connection::OPTION );
+	delete_option( NanoPost_Email_Check_Connection::NOTICE_OPTION );
+	delete_option( NanoPost_Email_Check_App::LOG_OPTION );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
+	wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 	delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
 	delete_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK );
 	global $wpdb;
@@ -139,7 +143,8 @@ add_filter(
 	'pre_http_request',
 	static function ( $pre, $args, $url ) {
 		// Mailpit and webhook-receiver calls, and tests of the real request, pass through.
-		if ( 0 === strpos( $url, 'http://mailpit:' ) || 0 === strpos( $url, 'http://webhook:' ) || ! empty( $GLOBALS['np_http_passthrough'] ) ) {
+		// Calls to the nanoPost app go to the fake app in integration-app.php.
+		if ( 0 === strpos( $url, 'http://mailpit:' ) || 0 === strpos( $url, 'http://webhook:' ) || 0 === strpos( $url, NanoPost_Email_Check_App::base_url() ) || ! empty( $GLOBALS['np_http_passthrough'] ) ) {
 			return $pre;
 		}
 		$GLOBALS['np_requests'][] = array(
@@ -1075,6 +1080,7 @@ require __DIR__ . '/integration-multisite-schedule.php';
 require __DIR__ . '/integration-diagnostics.php';
 require __DIR__ . '/integration-cli.php';
 require __DIR__ . '/integration-config.php';
+require __DIR__ . '/integration-app.php';
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );
@@ -1106,6 +1112,8 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	define( 'WP_UNINSTALL_PLUGIN', 'nanopost-email-check/nanopost-email-check.php' );
 }
 require NANOPOST_EMAIL_CHECK_DIR . 'uninstall.php';
+$np_calls = np_app_take();
+np_assert( 1 === count( $np_calls ) && 'DELETE' === $np_calls[0]['method'] && '/connection' === $np_calls[0]['path'] && 'Bearer tok-123' === $np_calls[0]['headers']['Authorization'] && 5 === $np_calls[0]['timeout'], 'uninstall: DELETE /connection with the token, 5 seconds', $np_calls );
 wp_cache_flush();
 $np_left = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $wpdb->options WHERE option_name LIKE 'nanopost\\_email\\_check%'" );
 np_assert( 0 === $np_left, 'no options left', $np_left );

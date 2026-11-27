@@ -189,6 +189,65 @@
 			"pad": 24,
 			"caption": "Overview: the webhook alert in a chat app, for a failure and the recovery.",
 			"alt": "A chat channel with two messages from Email Check: Email check failed on the site with SMTP Error: Could not authenticate, then Email check passed again."
+		},
+		{
+			"id": "help-connect",
+			"out": "screenshots/help/connect.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "Connect to nanoPost: what the site sends, before anything is sent.",
+			"alt": "The nanoPost section on the Email Check screen: what connecting adds, the list of data the site sends, a Connect to nanoPost button, and links to the terms, privacy and help."
+		},
+		{
+			"id": "help-connected",
+			"out": "screenshots/help/connected.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php connected"
+			],
+			"block": [
+				"**/assets/proof.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "A connected site: tests go to nanoPost.",
+			"alt": "The nanoPost section of a connected site: the address the tests go to, a link to the check in nanoPost, and a Disconnect button."
+		},
+		{
+			"id": "help-proof",
+			"out": "screenshots/help/proof-of-arrival.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php connected"
+			],
+			"block": [
+				"**/assets/proof.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"replace": {
+				".nanopost-email-check-proof-status": "Arrived at nanoPost: November 27, 2026 9:12 am. SPF: pass. DKIM: pass. DMARC: pass."
+			},
+			"from": "#nanopost-email-check-proof",
+			"to": "#nanopost-email-check-proof",
+			"caption": "Proof of arrival after Send test now.",
+			"alt": "The proof of arrival box: the test email arrived at nanoPost, with SPF, DKIM and DMARC pass, and links to the check and to help."
 		}
 	]
 }

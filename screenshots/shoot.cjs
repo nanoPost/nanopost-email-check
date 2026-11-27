@@ -53,6 +53,8 @@ async function shoot(browser, state, shot) {
     storageState: state,
   });
   const page = await context.newPage();
+  // URL patterns to refuse, for example a script that would call a real service.
+  for (const pattern of s.block || []) await page.route(pattern, (route) => route.abort());
   if (s.html) {
     // A local page, not the site. "data" is a WP-CLI command that prints JSON for it.
     if (s.data) await page.addInitScript((d) => { window.shotData = d; }, JSON.parse(wp(s.data)));

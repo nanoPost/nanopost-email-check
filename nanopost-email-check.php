@@ -32,6 +32,8 @@ require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-plu
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-help.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-alerts.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-webhook.php';
+require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-connection.php';
+require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-app.php';
 require_once NANOPOST_EMAIL_CHECK_DIR . 'includes/class-nanopost-email-check-admin.php';
 
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
