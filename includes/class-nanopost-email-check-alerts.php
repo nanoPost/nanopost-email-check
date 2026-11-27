@@ -135,6 +135,10 @@ class NanoPost_Email_Check_Alerts {
 			$alerts[ 'canary-unconfirmed:' . $unconfirmed['confirm_by'] ] = 'canary-unconfirmed';
 		}
 
+		foreach ( self::failing() as $email ) {
+			$alerts[ 'canary-failing:' . $email ] = 'canary-failing';
+		}
+
 		return $alerts;
 	}
 
@@ -149,6 +153,29 @@ class NanoPost_Email_Check_Alerts {
 		}
 		$block = NanoPost_Email_Check_Canary::block();
 		return null !== $block && 'unconfirmed' === $block['watching'] ? $block : null;
+	}
+
+	/**
+	 * Alert addresses that Email Canary's alerts do not reach (they bounce). The email
+	 * cannot tell the owner, so wp-admin does.
+	 *
+	 * @return string[]
+	 */
+	private static function failing() {
+		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
+			return array();
+		}
+		$block = NanoPost_Email_Check_Canary::block();
+		if ( null === $block ) {
+			return array();
+		}
+		$failing = array();
+		foreach ( $block['alerts_to'] as $entry ) {
+			if ( 'failing' === $entry['state'] ) {
+				$failing[] = $entry['email'];
+			}
+		}
+		return $failing;
 	}
 
 	/**
@@ -191,6 +218,8 @@ class NanoPost_Email_Check_Alerts {
 				self::render_stale( $key );
 			} elseif ( 'canary-unconfirmed' === $type ) {
 				self::render_unconfirmed( $key );
+			} elseif ( 'canary-failing' === $type ) {
+				self::render_failing( $key );
 			} else {
 				self::render_canary( $key );
 			}
@@ -247,6 +276,22 @@ class NanoPost_Email_Check_Alerts {
 			self::render_links( $key, '' === $problem['help_url'] ? array() : array( $problem['help_url'] => __( 'What to do', 'nanopost-email-check' ) ) );
 			echo '</div>';
 		}
+	}
+
+	/**
+	 * Notice for an alert address that Email Canary's alerts do not reach.
+	 *
+	 * @param string $key Alert key.
+	 */
+	private static function render_failing( $key ) {
+		$email = substr( $key, strlen( 'canary-failing:' ) );
+		echo '<div class="notice notice-error nanopost-email-check-notice-failing"><p><strong>';
+		/* translators: %s: email address. */
+		echo esc_html( sprintf( __( 'Email Canary: alerts do not reach %s.', 'nanopost-email-check' ), $email ) ) . '</strong> ';
+		echo esc_html__( 'Change the alert address on the plugin screen.', 'nanopost-email-check' );
+		echo '</p>';
+		self::render_links( $key, array( NanoPost_Email_Check_Help::canary( NanoPost_Email_Check_Help::CANARY_CHANGE, NanoPost_Email_Check_Help::PLACE_NOTICE_CANARY ) => __( 'How to change it', 'nanopost-email-check' ) ) );
+		echo '</div>';
 	}
 
 	/**

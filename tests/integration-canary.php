@@ -484,6 +484,8 @@ $np_set(
 		),
 	)
 );
+$np_html = np_notices();
+np_assert( false !== strpos( $np_html, 'Email Canary: alerts do not reach owner@example.com.' ) && false === strpos( $np_html, 'other@example.com' ), 'a failing alert address: a notice on other wp-admin pages too', $np_html );
 $np_area = np_xpath( np_render_screen() )->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
 np_assert( false !== strpos( $np_area, 'Email Canary: alerts do not reach owner@example.com.' ) && false !== strpos( $np_area, 'other@example.com (Open nanoPost to see.)' ), 'alert address states: "failing" says so, an unknown one says "Open nanoPost to see"', $np_area );
 
