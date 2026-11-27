@@ -746,6 +746,16 @@ delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
 $np_calls = np_app_take();
 np_assert( '/connect' === $np_calls[0]['path'] && 'Bearer ' . $np_tok === $np_calls[0]['headers']['Authorization'], 'turn on after not_confirmed: POST /connect with the same token', $np_calls[0] );
 
+// Turn on again with no room: POST /start answers over_limit (24 hours of proof).
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'stopped', 'right@example.com', 'confirmed', 'owner' ) ) ) );
+np_app_answer( 200, array( 'check' => np_app_block( 'over_limit', 'right@example.com', 'confirmed' ) ) );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'right@example.com' ) );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+np_app_take();
+np_assert( 'canary-over-limit' === $np_notice(), 'turn on, no room: the notice says alerts are off (limit), not "on again"' );
+
 // Over the limit, then stopped: POST /start when the account has room.
 update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'stopped', 'right@example.com', 'confirmed', 'over_limit' ) ) ) );
 np_app_answer( 409, array_merge( $np_409, array( 'check' => np_app_block( 'stopped', 'right@example.com', 'confirmed', 'over_limit' ) ) ) );

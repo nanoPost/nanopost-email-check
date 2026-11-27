@@ -347,7 +347,8 @@ class NanoPost_Email_Check_Admin {
 				}
 				if ( $call['ok'] && NanoPost_Email_Check_Connection::canary_active() ) {
 					self::send_first_test();
-					self::done( array( 'outcome' => 'canary-on-again' ) );
+					$block = NanoPost_Email_Check_Canary::block();
+					self::done( array( 'outcome' => null !== $block && 'over_limit' === $block['watching'] ? 'canary-over-limit' : 'canary-on-again' ) );
 				}
 				self::done( array( 'outcome' => 'canary-still-off' ) );
 			}
@@ -703,7 +704,7 @@ class NanoPost_Email_Check_Admin {
 			$outcome = isset( $outcome['outcome'] ) ? (string) $outcome['outcome'] : '';
 		}
 		$proof = '';
-		if ( in_array( $outcome, array( 'passed', 'failed', 'canary-on', 'canary-on-again' ), true ) ) {
+		if ( in_array( $outcome, array( 'passed', 'failed', 'canary-on', 'canary-on-again', 'canary-over-limit' ), true ) ) {
 			$proof = get_transient( self::PROOF_PREFIX . get_current_user_id() );
 			delete_transient( self::PROOF_PREFIX . get_current_user_id() );
 			$proof = is_string( $proof ) && NanoPost_Email_Check_Connection::canary_active() ? $proof : '';
@@ -735,6 +736,9 @@ class NanoPost_Email_Check_Admin {
 		} elseif ( 'canary-on-again' === $outcome ) {
 			$class   = 'notice-success';
 			$message = __( 'Email Canary is on again.', 'nanopost-email-check' );
+		} elseif ( 'canary-over-limit' === $outcome ) {
+			$class   = 'notice-warning';
+			$message = __( 'Email Canary: alerts are OFF. Your nanoPost account has reached its limit of sites. Remove one in nanoPost, or ask us for more.', 'nanopost-email-check' );
 		} elseif ( 'canary-still-off' === $outcome ) {
 			$class   = 'notice-warning';
 			$message = __( 'Email Canary could not turn on again. See why below.', 'nanopost-email-check' );
