@@ -337,9 +337,10 @@ class NanoPost_Email_Check_Admin {
 
 		$block = NanoPost_Email_Check_Canary::block();
 		if ( NanoPost_Email_Check_Connection::is_connected() ) {
-			$same    = strtolower( $email ) === strtolower( self::alert_address( $block ) );
-			$restart = null !== $block && 'stopped' === $block['watching'] && 'not_confirmed' !== $block['stopped_reason'];
-			if ( $same && $restart ) {
+			$same = strtolower( $email ) === strtolower( self::alert_address( $block ) );
+			if ( $same && ( null === $block || 'not_confirmed' !== $block['stopped_reason'] ) ) {
+				// The same address: "start". It also answers when the canary already
+				// watches (for example, an earlier click timed out here but reached the app).
 				$call = NanoPost_Email_Check_App::start( 'turn_on' );
 				if ( ! $call['ok'] && 409 !== $call['code'] ) {
 					self::done( self::failure( 'canary-failed', $call ) );
@@ -354,12 +355,9 @@ class NanoPost_Email_Check_Admin {
 				// Another address: a new canary (spec "Wrong owner"). The old one stops and
 				// is deleted after 30 days.
 				NanoPost_Email_Check_App::disconnect();
-			} else {
-				// Not confirmed in 24 hours: connect again with the same token, which sends a
-				// new confirm email.
-				$token = NanoPost_Email_Check_Connection::get()['token'];
-				self::forget_address_keep_token( $token, $email );
 			}
+			// Not confirmed in 24 hours: POST /connect again with the same token, which
+			// starts it again and sends a new confirm email.
 		}
 
 		$call = NanoPost_Email_Check_App::connect( $email );
@@ -368,26 +366,6 @@ class NanoPost_Email_Check_Admin {
 		}
 		self::send_first_test();
 		self::done( array( 'outcome' => 'canary-on' ) );
-	}
-
-	/**
-	 * Keep the token of a canary that was not confirmed, as a pending connect, so the
-	 * next "POST /connect" sends it again.
-	 *
-	 * @param string $token Token.
-	 * @param string $email Alert address.
-	 */
-	private static function forget_address_keep_token( $token, $email ) {
-		update_option(
-			NanoPost_Email_Check_Connection::OPTION,
-			array(
-				'token'       => $token,
-				'alert_email' => $email,
-				'pending_at'  => time(),
-				'home_url'    => home_url(),
-			),
-			false
-		);
 	}
 
 	/**
@@ -881,7 +859,8 @@ class NanoPost_Email_Check_Admin {
 			return;
 		}
 
-		if ( NanoPost_Email_Check_Canary::cannot_tell( $block ) ) {
+		// "Cannot tell" is about arrivals: it does not hide a stop or a missing confirm.
+		if ( 'on' === $block['watching'] && NanoPost_Email_Check_Canary::cannot_tell( $block ) ) {
 			echo '<p class="nanopost-email-check-state"><span aria-hidden="true">?</span> <strong>' . esc_html__( 'Email Canary cannot tell now.', 'nanopost-email-check' ) . '</strong> ' . esc_html__( 'Email Check sends your test emails as usual.', 'nanopost-email-check' ) . '</p>';
 			self::render_canary_actions( true );
 			return;

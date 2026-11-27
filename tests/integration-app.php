@@ -679,6 +679,21 @@ $np_calls = np_app_take();
 np_assert( '/start' === $np_calls[0]['path'] && array( 'trigger' => 'turn_on' ) === $np_calls[0]['body'] && '/announce' === $np_calls[1]['path'], 'turn on, same address: POST /start (turn_on), then a test', wp_list_pluck( $np_calls, 'path' ) );
 np_assert( 'canary-on-again' === $np_notice() && NanoPost_Email_Check_Connection::canary_active(), 'turn on again: on' );
 
+// A click that timed out here but reached the app: the next "Turn on" is a plain start.
+$np_conn_before = NanoPost_Email_Check_Connection::get();
+np_app_answer( 0 );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'owner@example.com' ) );
+np_app_take();
+np_assert( 'canary-failed' === $np_notice() && $np_conn_before === NanoPost_Email_Check_Connection::get(), 'turn on, start times out: nothing changes here' );
+np_app_answer( 200, array( 'check' => np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'owner@example.com' ) );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+$np_calls = np_app_take();
+np_assert( '/start' === $np_calls[0]['path'] && ! in_array( '/connect', wp_list_pluck( $np_calls, 'path' ), true ) && 'tok-123' === NanoPost_Email_Check_Connection::get()['token'], 'turn on while it already watches: POST /start again, never POST /connect, the token stays', wp_list_pluck( $np_calls, 'path' ) );
+np_assert( 'canary-on-again' === $np_notice(), 'then: on' );
+
 // Stopped from a mail link: the next announce answers 409.
 $np_409 = array(
 	'error'   => 'canary_stopped',

@@ -456,6 +456,15 @@ np_assert( false !== strpos( $np_area, 'did not arrive' ) && false !== strpos( $
 $np_set( array( 'receive_path' => 'unknown' ) );
 $np_area = np_xpath( np_render_screen() )->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
 np_assert( false !== strpos( $np_area, 'Email Canary cannot tell now.' ) && false === strpos( $np_area, 'did not arrive' ), 'our own outage: "cannot tell now"', $np_area );
+$np_set(
+	array(
+		'receive_path'   => 'unknown',
+		'watching'       => 'stopped',
+		'stopped_reason' => 'owner',
+	)
+);
+$np_area = np_xpath( np_render_screen() )->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
+np_assert( false !== strpos( $np_area, 'Email Canary is off.' ) && false === strpos( $np_area, 'cannot tell' ), 'stopped during our own outage: the stop shows, not "cannot tell"', $np_area );
 $np_set( array( 'next_expected_by' => gmdate( 'Y-m-d\TH:i:s\Z', time() - 60 ) ) );
 $np_area = np_xpath( np_render_screen() )->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
 np_assert( false !== strpos( $np_area, 'This is the state as of' ), 'an old block says how old it is', $np_area );

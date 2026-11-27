@@ -68,12 +68,15 @@ class NanoPost_Email_Check_Connection {
 	 * gets a new token. Two requests at the same time get the same token (add_option()).
 	 *
 	 * @param string $email Alert address.
-	 * @return string The token, or '' while a connection with an address exists.
+	 * @return string The token, or '' while a connection with an address exists (except
+	 *                for a canary that was not confirmed, which connects again).
 	 */
 	public static function begin( $email ) {
 		$current = self::get();
 		if ( '' !== $current['address'] && '' !== $current['token'] ) {
-			return '';
+			// A canary that was not confirmed in 24 hours: connect again with its token.
+			$block = NanoPost_Email_Check_Canary::block();
+			return null !== $block && 'not_confirmed' === $block['stopped_reason'] && $email === $current['alert_email'] ? $current['token'] : '';
 		}
 		if ( '' !== $current['token'] && $email === $current['alert_email'] ) {
 			return $current['token'];
