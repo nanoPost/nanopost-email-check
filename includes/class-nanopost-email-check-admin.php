@@ -337,7 +337,7 @@ class NanoPost_Email_Check_Admin {
 
 		$block = NanoPost_Email_Check_Canary::block();
 		if ( NanoPost_Email_Check_Connection::is_connected() ) {
-			$same = strtolower( $email ) === strtolower( self::alert_address( $block ) );
+			$same = self::is_alert_address( $email, $block );
 			if ( $same && ( null === $block || 'not_confirmed' !== $block['stopped_reason'] ) ) {
 				// The same address: "start". It also answers when the canary already
 				// watches (for example, an earlier click timed out here but reached the app).
@@ -429,6 +429,39 @@ class NanoPost_Email_Check_Admin {
 				'detail'  => $email,
 			)
 		);
+	}
+
+	/**
+	 * True when an address is one of the canary's own: confirmed, pending, or the one
+	 * typed last. Then "Turn on" starts the same canary.
+	 *
+	 * @param string     $email Address.
+	 * @param array|null $block Block, or null.
+	 * @return bool
+	 */
+	private static function is_alert_address( $email, $block ) {
+		$own = array( NanoPost_Email_Check_Connection::alert_email() );
+		if ( null !== $block ) {
+			$own = array_merge( $own, wp_list_pluck( $block['alerts_to'], 'email' ) );
+		}
+		return in_array( strtolower( $email ), array_map( 'strtolower', array_filter( $own ) ), true );
+	}
+
+	/**
+	 * The confirmed address that gets the alerts, else alert_address().
+	 *
+	 * @param array|null $block Block, or null.
+	 * @return string
+	 */
+	private static function confirmed_address( $block ) {
+		if ( null !== $block ) {
+			foreach ( $block['alerts_to'] as $entry ) {
+				if ( 'confirmed' === $entry['state'] ) {
+					return $entry['email'];
+				}
+			}
+		}
+		return self::alert_address( $block );
 	}
 
 	/**
@@ -914,7 +947,7 @@ class NanoPost_Email_Check_Admin {
 		}
 
 		if ( 'stopped' === $block['watching'] ) {
-			self::render_turn_on_form( $address, __( 'Turn on Email Canary', 'nanopost-email-check' ) );
+			self::render_turn_on_form( self::confirmed_address( $block ), __( 'Turn on Email Canary', 'nanopost-email-check' ) );
 			self::render_open_link( $block );
 			return;
 		}

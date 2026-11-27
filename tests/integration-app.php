@@ -694,6 +694,25 @@ $np_calls = np_app_take();
 np_assert( '/start' === $np_calls[0]['path'] && ! in_array( '/connect', wp_list_pluck( $np_calls, 'path' ), true ) && 'tok-123' === NanoPost_Email_Check_Connection::get()['token'], 'turn on while it already watches: POST /start again, never POST /connect, the token stays', wp_list_pluck( $np_calls, 'path' ) );
 np_assert( 'canary-on-again' === $np_notice(), 'then: on' );
 
+// After a Change, the canary has a confirmed and a pending address: both start it again.
+$np_two                = np_app_block( 'stopped', 'owner@example.com', 'confirmed', 'owner' );
+$np_two['alerts_to'][] = array(
+	'email' => 'next@example.com',
+	'state' => 'pending',
+);
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( $np_two ) ) );
+np_assert( 'owner@example.com' === np_xpath( np_render_screen() )->query( '//input[@id="nanopost_email_check_alert_email"]' )->item( 0 )->getAttribute( 'value' ), 'off after a Change: the field shows the confirmed address' );
+foreach ( array( 'Owner@Example.com', 'next@example.com' ) as $np_addr ) {
+	update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( $np_two ) ) );
+	np_app_answer( 200, array( 'check' => np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) );
+	add_filter( 'pre_wp_mail', '__return_true' );
+	$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => $np_addr ) );
+	remove_filter( 'pre_wp_mail', '__return_true' );
+	delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+	$np_calls = np_app_take();
+	np_assert( '/start' === $np_calls[0]['path'] && 'canary-on-again' === $np_notice(), 'turn on with ' . $np_addr . ' (one of the canary\'s addresses): POST /start', wp_list_pluck( $np_calls, 'path' ) );
+}
+
 // Stopped from a mail link: the next announce answers 409.
 $np_409 = array(
 	'error'   => 'canary_stopped',
