@@ -87,7 +87,7 @@ class NanoPost_Email_Check_Result {
 	/**
 	 * Whether nanoPost took the announce call for this test: ANNOUNCE_OK, ANNOUNCE_FAILED,
 	 * ANNOUNCE_ENDED (nanoPost answered 401: the connection had ended, for example the
-	 * check moved to another site), or '' when no call was due (not connected).
+	 * owner disconnected the site in nanoPost), or '' when no call was due (not connected).
 	 *
 	 * @var string
 	 */

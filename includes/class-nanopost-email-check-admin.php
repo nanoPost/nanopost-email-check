@@ -613,7 +613,7 @@ class NanoPost_Email_Check_Admin {
 		}
 		$message = NanoPost_Email_Check_Connection::ENDED_SITE_CHANGED === $reason
 			? __( 'The connection to nanoPost ended because the site address changed (for example a copied or moved site). Test emails go to the address in the settings again. Connect again to use nanoPost from this address.', 'nanopost-email-check' )
-			: __( 'nanoPost ended the connection to this site (it was removed in nanoPost, or moved to another site). Test emails go to the address in the settings again. Reconnect to use nanoPost.', 'nanopost-email-check' );
+			: __( 'nanoPost ended the connection to this site (it was disconnected or deleted in nanoPost). Test emails go to the address in the settings again. Reconnect to use nanoPost.', 'nanopost-email-check' );
 
 		echo '<div class="notice notice-warning nanopost-email-check-reconnect"><p>' . esc_html( $message ) . '</p><p>';
 		self::connect_button( __( 'Reconnect', 'nanopost-email-check' ) );

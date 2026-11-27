@@ -381,7 +381,7 @@ np_assert( $np_hooks() === $np_n + 3 && '' === $np_status(), 'then announce 2xx,
 $np_run( true );
 np_assert( $np_hooks() === $np_n + 3, 'then announce 2xx, passed: no second recovery from the plugin' );
 
-// 401: the connection ended (a move); no fallback alert for the refused test.
+// 401: the connection ended (disconnected in nanoPost); no fallback alert for the refused test.
 $np_run( false, 503 );
 np_assert( $np_hooks() === $np_n + 4 && 'fail' === $np_status(), 'fallback alert again (state fail)' );
 np_app_answer(

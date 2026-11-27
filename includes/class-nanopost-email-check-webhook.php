@@ -54,7 +54,7 @@ class NanoPost_Email_Check_Webhook {
 		// own state. A recovery after the plugin's own fallback alert (sent when the call
 		// failed, which nanoPost never saw) still goes out below.
 		// The same when nanoPost answered 401: the connection had ended (for example the
-		// owner moved the check to another site, so the old address refused this test).
+		// owner disconnected the site in nanoPost, which then refuses mail to its address).
 		// The screen shows "Reconnect", and the next test goes to the recipient setting,
 		// where a real mail problem alerts as usual.
 		if ( in_array( $result->announce, array( NanoPost_Email_Check_Result::ANNOUNCE_OK, NanoPost_Email_Check_Result::ANNOUNCE_ENDED ), true ) && ! $result->passed ) {
