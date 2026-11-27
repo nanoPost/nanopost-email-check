@@ -684,7 +684,7 @@ $np_conn_before = NanoPost_Email_Check_Connection::get();
 np_app_answer( 0 );
 $np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'owner@example.com' ) );
 np_app_take();
-np_assert( 'canary-failed' === $np_notice() && $np_conn_before === NanoPost_Email_Check_Connection::get(), 'turn on, start times out: nothing changes here' );
+np_assert( 'canary-failed' === $np_notice() && NanoPost_Email_Check_Connection::get() === $np_conn_before, 'turn on, start times out: nothing changes here' );
 np_app_answer( 200, array( 'check' => np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) );
 add_filter( 'pre_wp_mail', '__return_true' );
 $np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'owner@example.com' ) );
