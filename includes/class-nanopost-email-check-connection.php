@@ -49,6 +49,8 @@ class NanoPost_Email_Check_Connection {
 			'too_old_from' => '',
 			'retry_until'  => 0,
 			'site_hash'    => '',
+			'alert_email'  => '',
+			'pending_at'   => 0,
 		);
 
 		$connection = array();
@@ -60,35 +62,113 @@ class NanoPost_Email_Check_Connection {
 	}
 
 	/**
-	 * Store the connection from the answer to "Exchange the code".
+	 * Start "Turn on Email Canary": the token the plugin makes for the connect call. It is
+	 * stored before the call, so a retry sends the same token and the app does not make a
+	 * second canary. A pending token for the same address is used again; another address
+	 * gets a new token. Two requests at the same time get the same token (add_option()).
 	 *
-	 * @param array $answer Decoded answer: token, check_id, address, check_url.
-	 * @return bool False when the answer lacks a token or a valid address.
+	 * @param string $email Alert address.
+	 * @return string The token, or '' while a connection with an address exists.
 	 */
-	public static function save_from_exchange( $answer ) {
-		$answer  = is_array( $answer ) ? $answer : array();
-		$token   = isset( $answer['token'] ) && is_string( $answer['token'] ) ? $answer['token'] : '';
-		$address = isset( $answer['address'] ) && is_string( $answer['address'] ) ? $answer['address'] : '';
-		$url     = isset( $answer['check_url'] ) && is_string( $answer['check_url'] ) ? esc_url_raw( $answer['check_url'], array( 'https', 'http' ) ) : '';
+	public static function begin( $email ) {
+		$current = self::get();
+		if ( '' !== $current['address'] && '' !== $current['token'] ) {
+			return '';
+		}
+		if ( '' !== $current['token'] && $email === $current['alert_email'] ) {
+			return $current['token'];
+		}
+		$pending = array(
+			'token'       => self::new_token(),
+			'alert_email' => (string) $email,
+			'pending_at'  => time(),
+			'home_url'    => home_url(),
+		);
+		if ( '' === $current['token'] && ! add_option( self::OPTION, $pending, '', false ) ) {
+			// Another request stored a token a moment ago: use it when it is for this address.
+			wp_cache_delete( self::OPTION, 'options' );
+			$current = self::get();
+			if ( $email === $current['alert_email'] && '' !== $current['token'] ) {
+				return $current['token'];
+			}
+		}
+		update_option( self::OPTION, $pending, false );
+		return $pending['token'];
+	}
 
-		if ( '' === $token || ! is_email( $address ) ) {
+	/**
+	 * A new token: 32 random bytes, base64url without padding (43 characters).
+	 *
+	 * @return string
+	 */
+	public static function new_token() {
+		return rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encodes a random token, nothing is hidden.
+	}
+
+	/**
+	 * Store the connection from the answer to "POST /connect". The token is the one the
+	 * plugin made (begin()).
+	 *
+	 * @param array  $answer    Decoded answer: address, check_url, check.
+	 * @param string $site_hash Hash of the site settings the connect call carried.
+	 * @return bool False when the answer lacks a valid address or no token is pending.
+	 */
+	public static function save_from_connect( $answer, $site_hash ) {
+		$answer  = is_array( $answer ) ? $answer : array();
+		$current = self::get();
+		$address = isset( $answer['address'] ) && is_string( $answer['address'] ) ? $answer['address'] : '';
+		if ( '' === $current['token'] || ! is_email( $address ) ) {
 			return false;
 		}
-
 		update_option(
 			self::OPTION,
 			array(
-				'token'        => $token,
+				'token'        => $current['token'],
 				'address'      => $address,
-				'check_id'     => isset( $answer['check_id'] ) && is_scalar( $answer['check_id'] ) ? (string) $answer['check_id'] : '',
-				'check_url'    => $url,
+				'check_id'     => '',
+				'check_url'    => isset( $answer['check_url'] ) && is_string( $answer['check_url'] ) ? esc_url_raw( $answer['check_url'], array( 'https', 'http' ) ) : '',
 				'home_url'     => home_url(),
 				'connected_at' => time(),
+				'alert_email'  => $current['alert_email'],
+				'site_hash'    => (string) $site_hash,
 			),
 			false
 		);
 		delete_option( self::NOTICE_OPTION );
 		return true;
+	}
+
+	/**
+	 * The alert address the owner last typed, or ''.
+	 *
+	 * @return string
+	 */
+	public static function alert_email() {
+		return self::get()['alert_email'];
+	}
+
+	/**
+	 * Remember the alert address the owner typed (after "Change").
+	 *
+	 * @param string $email Address.
+	 */
+	public static function set_alert_email( $email ) {
+		self::update( array( 'alert_email' => (string) $email ) );
+	}
+
+	/**
+	 * True while connected and Email Canary does not say it stopped watching. The test then
+	 * goes to the canary address. While stopped, it goes to the recipient setting, and the
+	 * plugin calls nanoPost only to start again or to end.
+	 *
+	 * @return bool
+	 */
+	public static function canary_active() {
+		if ( ! self::is_connected() ) {
+			return false;
+		}
+		$block = NanoPost_Email_Check_Canary::block();
+		return null === $block || 'stopped' !== $block['watching'];
 	}
 
 	/**

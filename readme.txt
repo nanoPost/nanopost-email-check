@@ -48,8 +48,8 @@ SMTP and email log plugins send and record the site's real mail, and some of the
 * **Settings in code:** set the recipient, interval and webhook URL in `wp-config.php`. The plugin screen shows them read-only.
 * **Mailer shown:** each result records how the site sends: SMTP server and port, PHP `mail()`, or another plugin, and which plugin set it up. When PHP `mail()` fails because the sendmail program is missing, the error says so.
 * **Multisite:** each site runs its own checks, with its own settings, log and notices.
-* **Optional proof of arrival:** connect the site to nanoPost (opt-in) to see whether each test email arrived, with its SPF, DKIM and DMARC results, and to get an alert from nanoPost when a test does not arrive.
-* **No outside requests** unless you set a webhook or connect to nanoPost.
+* **Optional Email Canary:** turn it on (opt-in) to see whether each test email arrived at nanoPost, with its SPF, DKIM and DMARC results, in the log, in a notice and in Site Health, and to get an email when a test email does not arrive.
+* **No outside requests** unless you set a webhook or turn on Email Canary.
 
 = What a pass means =
 
@@ -95,11 +95,11 @@ No. It sends test emails only to the address or addresses you set (at most 3).
 
 = Does the plugin send data to nanoPost? =
 
-Only if you connect the site to nanoPost on the plugin screen. Without a connection, nothing is sent to nanoPost. See "External services" below for what a connected site sends.
+Only if you turn on Email Canary on the plugin screen. Until then, nothing is sent to nanoPost. See "External services" below for what the site sends while Email Canary is on.
 
-= What does connecting to nanoPost add? =
+= What does Email Canary add? =
 
-A connected site sends each test email to nanoPost instead of the recipient you set. nanoPost shows whether the email arrived, with its SPF, DKIM and DMARC results ("Send test now" shows this proof of arrival on the plugin screen), and alerts you when a test does not arrive. Connecting is optional, and the plugin works in full without it. Disconnect on the plugin screen at any time: test emails then go to your recipient again.
+Email Check can tell you that WordPress accepted the test email. Email Canary checks that it arrived. While it is on, each test email goes to Email Canary instead of the recipient you set. The plugin screen then shows, for each test, whether it arrived at nanoPost, with its SPF, DKIM and DMARC results, and Email Canary emails you when a test email does not arrive or does not pass. Type an alert address and click "Turn on Email Canary": a test email goes out at once, and you confirm the address by email. Until you confirm, alerts are off. Email Canary is optional, and the plugin works in full without it. Turn it off on the plugin screen at any time: test emails then go to your recipient again.
 
 = The notice says the checks have stopped. What does that mean? =
 
@@ -140,21 +140,23 @@ Deleting the plugin removes its settings, the log, the webhook state, the dismis
 
 == External services ==
 
-The plugin makes no outside requests unless you set a webhook URL or connect the site to nanoPost.
+The plugin makes no outside requests unless you set a webhook URL or turn on Email Canary.
 
-= nanoPost app (optional, after you connect) =
+= nanoPost Email Canary (optional, after you turn it on) =
 
-nanoPost (app.nanopo.st) is a mail monitoring service run by the plugin's authors. The plugin calls it only after you click "Connect to nanoPost" on the plugin screen and approve the site in your browser. Until then, nothing is sent. When you disconnect, or delete the plugin, the plugin tells nanoPost and stops all calls.
+nanoPost Email Canary (app.nanopo.st) is a service run by the plugin's authors. It checks that each test email arrives, and emails you when one does not. The plugin calls it only after you type an alert address and click "Turn on Email Canary" on the plugin screen. Until then, nothing is sent. When you turn it off, deactivate the plugin or delete it, the plugin tells Email Canary.
 
-While connected, the site sends:
+While Email Canary is on, the site sends:
 
-* when you connect: a one-time approval code, the site address, and the address of its admin area, so nanoPost can send your browser back after you approve;
-* the site address, the versions of the plugin, WordPress and PHP, the check interval, and the webhook URL if you set one: after you connect, and again when one of them changes;
-* for each test: a test ID, the time it was sent, what started it (the schedule, a user or WP-CLI), whether `wp_mail()` succeeded, and its error text (at most 500 characters; it can contain host names or email addresses);
-* when you press "Send test now": a request for that test's result, while the plugin screen is open (at most 2 minutes);
+* when you turn it on: the site address, the alert address you typed, the site's time zone, the test interval, the webhook URL if you set one, the versions of the plugin, WordPress and PHP, and a random key that the plugin makes for this site;
+* the same site settings again when one of them changes;
+* for each test: a test ID, the time it was sent, what started it (the schedule, a user or WP-CLI), whether WordPress accepted the email, and its error text if it did not (at most 500 characters; it can contain host names or email addresses);
+* a request for the result of each test, after it is due, and for the state of the site when you open the plugin screen;
+* when you resend the confirm email or change the alert address: that address;
+* when you turn it off or on, deactivate or activate the plugin: which of these happened;
 * the plugin version in every call.
 
-The test emails go to nanoPost's address for the site's check instead of the recipient you set. nanoPost receives each test email and its headers, as for any email. nanoPost keeps the IP address of each call for 30 days. The plugin sends no user data, no other email, and no other settings.
+The test emails go to Email Canary's address for the site instead of the recipient you set. Email Canary receives each test email and its headers, as for any email. nanoPost keeps the IP address of each call for 30 days. The plugin sends no user names or other user data, no other email, and no other settings. The alert address is sent only as you typed it.
 
 * Terms of use: https://nanopo.st/terms/#the-app-appnanopost
 * Privacy policy: https://nanopo.st/privacy/#the-app-appnanopost
@@ -165,7 +167,7 @@ When you enter a webhook URL, the plugin sends an HTTP POST to that URL when a c
 
 The "Send test alert" button on the plugin screen, or `wp email-check test-alert`, sends one test message to the webhook URL, only when you use it. Its text says that it is a test and that no check failed. It has the same fields as a failure message, plus `"test": true`, so a receiver can handle it like a real alert or skip it. Real alerts do not have the `test` field. For a Google Chat URL, only the text line is sent. Example:
 
-`{"text": "Test alert from Email Check on https://example.com. This is only a test of the webhook. No check failed.", "site": "https://example.com", "status": "fail", "error": "Test alert. No check failed.", "time": "2026-11-24T09:30:00+00:00", "test": true}`
+`{"text": "[Email Check] Test alert from example.com. This is only a test of the webhook. No check failed.", "site": "https://example.com", "status": "fail", "error": "Test alert. No check failed.", "time": "2026-11-24T09:30:00+00:00", "test": true}`
 
 The setup help names these services. The plugin sends to them only when you enter one of their webhook URLs:
 
@@ -188,6 +190,15 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when a check fails, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.8.0 =
+* Email Canary replaces "Connect to nanoPost": type an alert address and turn it on from the plugin screen. No sign-up in the browser. A test email goes out at once, with its proof of arrival.
+* The plugin screen, notices and Site Health show the state from Email Canary: whether each test email arrived, with SPF, DKIM and DMARC as labels, also for scheduled tests.
+* Resend or change the alert address, and turn Email Canary off and on again, on the plugin screen.
+* A deactivation tells Email Canary to stop watching; an activation starts it again.
+* While Email Canary is not watching (before the confirm, or off), the plugin's own webhook alerts as when it is not on.
+* The plugin's webhook messages start with "[Email Check]" and name the site, for example "[Email Check] example.com could not send its test email: ...". The JSON fields do not change.
+* Sites connected with 1.7 stay on, with no new confirm.
 
 = 1.7.0 =
 * Optional connection to nanoPost (opt-in): connect the site on the plugin screen and approve it in your browser. While connected, each test email goes to nanoPost, which records whether it arrived, with its SPF, DKIM and DMARC results, and alerts you when a test does not arrive. Nothing is sent before you connect. See "External services" for what a connected site sends.

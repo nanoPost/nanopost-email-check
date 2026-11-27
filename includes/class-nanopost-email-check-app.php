@@ -9,7 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * The one place that talks to the app (https://app.nanopo.st/api/v1). Every call needs a
- * connection the owner made, except the code exchange that makes it. A failed call never
+ * connection the owner made, or the token of "Turn on Email Canary". A failed call never
  * fails a test and never blocks a page: the timeouts are short, and a call runs only in
  * WP-Cron, WP-CLI, or a request the owner started with a click.
  */
@@ -21,6 +21,17 @@ class NanoPost_Email_Check_App {
 	 * Single WP-Cron event that sends the site settings.
 	 */
 	const SYNC_HOOK = 'nanopost_email_check_site_sync';
+
+	/**
+	 * Single WP-Cron event after an activation: "start" with trigger "activate".
+	 */
+	const START_HOOK = 'nanopost_email_check_start';
+
+	/**
+	 * A deactivation stops the canary on each site until this many seconds have passed,
+	 * so a large network does not time out.
+	 */
+	const DEACTIVATE_BUDGET = 20;
 
 	/**
 	 * Recent failed calls, for support. Not autoloaded.
@@ -41,6 +52,7 @@ class NanoPost_Email_Check_App {
 	 */
 	public static function init() {
 		add_action( self::SYNC_HOOK, array( __CLASS__, 'sync_site' ) );
+		add_action( self::START_HOOK, array( __CLASS__, 'start_after_activate' ) );
 		add_action( 'update_option_' . NanoPost_Email_Check_Settings::OPTION, array( __CLASS__, 'queue_sync' ), 10, 0 );
 		add_action( 'add_option_' . NanoPost_Email_Check_Settings::OPTION, array( __CLASS__, 'queue_sync' ), 10, 0 );
 	}
@@ -59,51 +71,118 @@ class NanoPost_Email_Check_App {
 	}
 
 	/**
-	 * The page in the browser where the owner approves the connection.
+	 * "Turn on Email Canary": make the canary with the token the plugin made, and store the
+	 * connection. The owner's click (admin-post) or WP-CLI.
 	 *
-	 * @param string $return_url Where the app sends the browser back to.
-	 * @param string $state      The plugin's random state.
-	 * @return string
+	 * @param string $email Alert address.
+	 * @return array Call result (see request()). error "bad_answer" when the answer lacks
+	 *               a valid canary address; "connected" when a connection already exists.
 	 */
-	public static function connect_url( $return_url, $state ) {
-		$base = preg_replace( '#/api/v\d+$#', '', self::base_url() );
-		return add_query_arg(
-			array(
-				'site'   => rawurlencode( home_url() ),
-				'return' => rawurlencode( $return_url ),
-				'state'  => rawurlencode( $state ),
-			),
-			$base . '/connect'
-		);
+	public static function connect( $email ) {
+		$token = NanoPost_Email_Check_Connection::begin( $email );
+		if ( '' === $token ) {
+			return self::not_sent( 'connected' );
+		}
+		$body = self::site_body();
+		$hash = md5( (string) wp_json_encode( $body ) );
+
+		$body['alert_email'] = (string) $email;
+		$result              = self::request( 'POST', '/connect', $body, self::TIMEOUT_LONG, true, false, $token );
+
+		if ( $result['ok'] && ! NanoPost_Email_Check_Connection::save_from_connect( $result['body'], $hash ) ) {
+			$result['ok']    = false;
+			$result['error'] = 'bad_answer';
+			self::log( 'POST', '/connect', $result );
+		}
+		if ( $result['ok'] ) {
+			NanoPost_Email_Check_Canary::forget();
+			NanoPost_Email_Check_Canary::take( $result['body'] );
+			NanoPost_Email_Check_Webhook::reset_check( 'wp_mail' );
+		}
+		return $result;
 	}
 
 	/**
-	 * Exchange the one-time code for a token, and store the connection.
+	 * "Resend" (the same address) or "Change" (another address) of the alert address.
 	 *
-	 * @param string $code The code from the app's redirect.
-	 * @return array Call result (see request()).
+	 * @param string $email Address.
+	 * @return array Call result.
 	 */
-	public static function exchange( $code ) {
-		$result = self::request(
-			'POST',
-			'/connect/exchange',
-			array(
-				'code'     => (string) $code,
-				'site_url' => home_url(),
-			),
-			self::TIMEOUT_LONG,
-			false
-		);
-		if ( $result['ok'] && ! NanoPost_Email_Check_Connection::save_from_exchange( $result['body'] ) ) {
-			$result['ok']    = false;
-			$result['error'] = 'bad_answer';
-			self::log( 'POST', '/connect/exchange', $result );
-		}
+	public static function set_alert_email( $email ) {
+		$result = self::request( 'PUT', '/alert-email', array( 'email' => (string) $email ), self::TIMEOUT_SHORT, true, true );
 		if ( $result['ok'] ) {
-			NanoPost_Email_Check_Webhook::reset_check( 'wp_mail' );
+			NanoPost_Email_Check_Canary::take( $result['body'] );
+			NanoPost_Email_Check_Connection::set_alert_email( $email );
+		}
+		return $result;
+	}
+
+	/**
+	 * Stop watching: "Turn Email Canary off" (turn_off) or a deactivation (deactivate). The
+	 * token is kept, so "Turn on" needs no new confirm.
+	 *
+	 * @param string $trigger turn_off or deactivate.
+	 * @param int    $timeout Timeout in seconds.
+	 * @return array Call result.
+	 */
+	public static function stop( $trigger, $timeout = self::TIMEOUT_SHORT ) {
+		$result = self::request( 'POST', '/stop', array( 'trigger' => (string) $trigger ), $timeout, true, true );
+		if ( $result['ok'] ) {
+			NanoPost_Email_Check_Canary::take( $result['body'] );
+		}
+		return $result;
+	}
+
+	/**
+	 * Watch again: "Turn on" with the same address (turn_on) or an activation (activate).
+	 *
+	 * @param string $trigger turn_on or activate.
+	 * @return array Call result.
+	 */
+	public static function start( $trigger ) {
+		$result = self::request( 'POST', '/start', array( 'trigger' => (string) $trigger ), self::TIMEOUT_SHORT, true, true );
+		if ( $result['ok'] ) {
+			NanoPost_Email_Check_Canary::take( $result['body'] );
 			self::queue_sync();
 		}
 		return $result;
+	}
+
+	/**
+	 * Deactivation: tell nanoPost to stop watching (best effort), so it sends no "missing"
+	 * alert for a plugin that was turned off on purpose. The token stays, so an activation
+	 * can start it again. The stop link in each alert email is the second way.
+	 *
+	 * @param int $deadline Unix time after which no more calls go out (network loops).
+	 */
+	public static function stop_on_deactivate( $deadline ) {
+		if ( time() >= $deadline || ! NanoPost_Email_Check_Connection::canary_active() ) {
+			return;
+		}
+		$block = NanoPost_Email_Check_Canary::block();
+		if ( null !== $block && 'unconfirmed' === $block['watching'] ) {
+			return;
+		}
+		self::stop( 'deactivate', min( self::TIMEOUT_SHORT, max( 1, $deadline - time() ) ) );
+	}
+
+	/**
+	 * Activation: book the "start" call in WP-Cron, not in the activation request.
+	 */
+	public static function queue_start() {
+		if ( NanoPost_Email_Check_Connection::is_connected() && false === wp_next_scheduled( self::START_HOOK ) ) {
+			wp_schedule_single_event( time(), self::START_HOOK );
+		}
+	}
+
+	/**
+	 * WP-Cron after an activation. nanoPost starts watching again only when the stop came
+	 * from a deactivation; for any other stop it answers 409, and the canary stays off.
+	 */
+	public static function start_after_activate() {
+		if ( NanoPost_Email_Check_Connection::is_connected() ) {
+			self::start( 'activate' );
+		}
 	}
 
 	/**
@@ -114,7 +193,8 @@ class NanoPost_Email_Check_App {
 	 * @return array Call result.
 	 */
 	public static function disconnect( $timeout = self::TIMEOUT_SHORT ) {
-		$result = NanoPost_Email_Check_Connection::is_connected()
+		$token  = NanoPost_Email_Check_Connection::get()['token'];
+		$result = '' !== $token && NanoPost_Email_Check_Connection::is_connected()
 			? self::request( 'DELETE', '/connection', null, $timeout, true, true )
 			: self::not_sent( 'not_connected' );
 		NanoPost_Email_Check_Connection::end();
@@ -182,6 +262,7 @@ class NanoPost_Email_Check_App {
 			'php_version'    => PHP_VERSION,
 			'interval'       => NanoPost_Email_Check_Settings::interval(),
 			'webhook_url'    => '' === $webhook ? null : $webhook,
+			'timezone'       => wp_timezone_string(),
 		);
 	}
 
@@ -192,7 +273,7 @@ class NanoPost_Email_Check_App {
 	 * @return array|null Call result, or null when nothing changed or no call is allowed.
 	 */
 	public static function sync_site() {
-		if ( ! NanoPost_Email_Check_Connection::calls_allowed() ) {
+		if ( ! NanoPost_Email_Check_Connection::calls_allowed() || ! NanoPost_Email_Check_Connection::canary_active() ) {
 			return null;
 		}
 		$body = self::site_body();
@@ -236,23 +317,42 @@ class NanoPost_Email_Check_App {
 	 * @param array|null $body    JSON body, or null.
 	 * @param int        $timeout Timeout in seconds.
 	 * @param bool       $auth    Send the token. Calls with the token need a connection.
-	 * @param bool       $always  Make the call also while calls are stopped (disconnect).
+	 * @param bool       $always  Make the call also while Email Canary is off (the calls
+	 *                            that start, stop or end it, and the alert address).
+	 * @param string     $token   A token for a site with no connection yet (POST /connect).
 	 * @return array ok (bool), code (HTTP status, 0 when no answer), error (stable code),
 	 *               message (the app's text, may be shown), body (decoded JSON array),
 	 *               date (the Date header of the answer, or '').
 	 */
-	public static function request( $method, $path, $body = null, $timeout = self::TIMEOUT_SHORT, $auth = true, $always = false ) {
+	public static function request( $method, $path, $body = null, $timeout = self::TIMEOUT_SHORT, $auth = true, $always = false, $token = '' ) {
 		$headers = array(
 			'Accept'           => 'application/json',
 			'X-Plugin-Version' => NANOPOST_EMAIL_CHECK_VERSION,
 		);
 
-		if ( $auth ) {
+		if ( $auth && '' !== $token ) {
+			$connection = NanoPost_Email_Check_Connection::get();
+			if ( '' !== NanoPost_Email_Check_Connection::too_old_message() ) {
+				return self::not_sent( 'too_old' );
+			}
+			if ( $connection['retry_until'] > time() ) {
+				return self::not_sent( 'waiting' );
+			}
+			$headers['Authorization'] = 'Bearer ' . $token;
+		} elseif ( $auth ) {
 			if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
 				return self::not_sent( 'not_connected' );
 			}
-			if ( ! $always && ! NanoPost_Email_Check_Connection::calls_allowed() ) {
-				return self::not_sent( 'stopped' );
+			// The disconnect always goes out: it ends the connection here too.
+			$ending = 'DELETE' === $method;
+			if ( ! $ending && '' !== NanoPost_Email_Check_Connection::too_old_message() ) {
+				return self::not_sent( 'too_old' );
+			}
+			if ( ! $ending && NanoPost_Email_Check_Connection::get()['retry_until'] > time() ) {
+				return self::not_sent( 'waiting' );
+			}
+			if ( ! $always && ! NanoPost_Email_Check_Connection::canary_active() && 'GET /check' !== $method . ' ' . $path ) {
+				return self::not_sent( 'canary_off' );
 			}
 			$headers['Authorization'] = 'Bearer ' . NanoPost_Email_Check_Connection::get()['token'];
 		}
@@ -304,6 +404,10 @@ class NanoPost_Email_Check_App {
 
 		if ( 401 === $code && $auth ) {
 			NanoPost_Email_Check_Connection::end( NanoPost_Email_Check_Connection::ENDED_REVOKED );
+		} elseif ( 409 === $code && 'canary_stopped' === $result['error'] ) {
+			// Email Canary stopped watching (for example "Stop watching" in an alert email).
+			// The block says why; the next tests go to the recipient setting.
+			NanoPost_Email_Check_Canary::take( $decoded );
 		} elseif ( 410 === $code ) {
 			NanoPost_Email_Check_Connection::mark_too_old( $result['message'] );
 		} elseif ( 429 === $code ) {

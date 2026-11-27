@@ -266,6 +266,17 @@ np_app_take();
 $np_row = NanoPost_Email_Check_Log::latest();
 np_assert( array() === np_fetches() && 'arrived' === $np_row->canary['arrival'] && 'fail' === $np_row->canary['dmarc'] && time() - 30 === $np_row->canary['arrived_at'], 'arrived: the row has the time and the results, no more tries', $np_row->canary );
 
+np_app_answer(
+	200,
+	array(
+		'test_id' => $np_id,
+		'status'  => 'unknown',
+	)
+);
+NanoPost_Email_Check_Canary::fetch_test( $np_id, 2 );
+np_app_take();
+np_assert( 'arrived' === NanoPost_Email_Check_Log::latest()->canary['arrival'], 'an "unknown" answer (our own outage) does not replace a known result' );
+
 np_app_answer( 0 );
 NanoPost_Email_Check_Canary::fetch_test( $np_id, 1 );
 np_app_take();
@@ -346,6 +357,21 @@ $np_set(
 );
 np_assert( 2 === count( NanoPost_Email_Check_Canary::problems( NanoPost_Email_Check_Canary::block() ) ), 'did not pass and did not arrive: both open at once' );
 
+$np_set(
+	array(
+		'watching'   => 'unconfirmed',
+		'confirm_by' => gmdate( 'Y-m-d\TH:i:s\Z', time() + HOUR_IN_SECONDS ),
+		'alerts_to'  => array(
+			array(
+				'email' => 'owner@example.com',
+				'state' => 'pending',
+			),
+		),
+	)
+);
+$np_html = np_notices();
+np_assert( false !== strpos( $np_html, 'Email Canary: alerts are OFF until you confirm.' ) && false !== strpos( $np_html, 'We sent an email to owner@example.com.' ), 'not confirmed: a notice that stays on other wp-admin pages', $np_html );
+
 np_app_connect( array( 'home_url' => 'https://elsewhere.example' ) );
 np_assert( false === strpos( np_notices(), 'Email Canary' ), 'not connected: no Email Canary notice' );
 
@@ -365,7 +391,7 @@ $np_hooks = static function () {
 	);
 };
 $np_n     = $np_hooks();
-foreach ( array( 'unconfirmed', 'stopped', 'over_limit' ) as $np_state ) {
+foreach ( array( 'unconfirmed', 'over_limit' ) as $np_state ) {
 	np_app_answer( 202, array( 'check' => np_block( array( 'watching' => $np_state ) ) ) );
 	add_filter( 'pre_wp_mail', '__return_false' );
 	$np_r = NanoPost_Email_Check_Plugin::run_checks( 'scheduled' )[0];
@@ -384,6 +410,7 @@ foreach ( array( 'unconfirmed', 'stopped', 'over_limit' ) as $np_state ) {
 np_app_answer( 202, array( 'check' => np_block() ) );
 add_filter( 'pre_wp_mail', '__return_false' );
 NanoPost_Email_Check_Plugin::run_checks( 'scheduled' );
+np_assert( array() === $GLOBALS['np_app_next'], 'every queued answer was used' );
 remove_filter( 'pre_wp_mail', '__return_false' );
 np_app_take();
 np_assert( $np_hooks() === $np_n, 'announce 2xx, watching on: the plugin stays quiet (Email Canary alerts)' );
@@ -417,7 +444,7 @@ NanoPost_Email_Check_Log::update_test(
 );
 $np_x    = np_xpath( np_render_screen() );
 $np_area = $np_x->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
-np_assert( false !== strpos( $np_area, 'Email Canary is on.' ) && false !== strpos( $np_area, 'owner@example.com' ) && false !== strpos( $np_area, 'Expected by' ), 'on: the state, the alert address in full, the next deadline', $np_area );
+np_assert( false !== strpos( $np_area, 'Email Canary is on' ) && false !== strpos( $np_area, 'owner@example.com' ) && false !== strpos( $np_area, 'Expected by' ), 'on: the state, the alert address in full, the next deadline', $np_area );
 np_assert( 1 === $np_x->query( '//div[@id="nanopost-email-check-canary"]//span[contains(@class,"nanopost-email-check-auth-warn") and contains(., "DKIM not signed")]' )->length, 'the last arrival: a warning label "DKIM not signed", with a mark' );
 np_assert( 1 === $np_x->query( '//div[@id="nanopost-email-check-log"]//th[.="Email Canary"]' )->length, 'the log has an Email Canary column' );
 $np_cell = $np_x->query( '//td[contains(@class,"nanopost-email-check-canary-cell")]' )->item( 0 )->textContent;

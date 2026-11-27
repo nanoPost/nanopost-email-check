@@ -43,9 +43,9 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		$time       = time();
 		$test_id    = '';
 
-		// While connected to nanoPost, the test goes only to the check's address, with a
-		// new test ID in it. The recipient setting is used again after a disconnect.
-		if ( NanoPost_Email_Check_Connection::is_connected() ) {
+		// While Email Canary is on, the test goes only to the canary address, with a new
+		// test ID in it. The recipient setting is used again when it is off.
+		if ( NanoPost_Email_Check_Connection::canary_active() ) {
 			$test_id    = NanoPost_Email_Check_Connection::new_test_id();
 			$recipient  = NanoPost_Email_Check_Connection::test_address( $test_id );
 			$recipients = array( $recipient );
@@ -104,6 +104,9 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 	private static function announce_outcome( $call ) {
 		if ( 401 === $call['code'] ) {
 			return NanoPost_Email_Check_Result::ANNOUNCE_ENDED;
+		}
+		if ( 409 === $call['code'] ) {
+			return NanoPost_Email_Check_Result::ANNOUNCE_UNWATCHED;
 		}
 		if ( ! $call['ok'] ) {
 			return NanoPost_Email_Check_Result::ANNOUNCE_FAILED;

@@ -349,6 +349,15 @@ class NanoPost_Email_Check_Canary {
 		if ( '' === $test['test_id'] ) {
 			return;
 		}
+		// During our own outage the app answers "unknown". That never replaces a result the
+		// row already has: an old test stays "arrived" or "did not arrive".
+		if ( 'unknown' === $test['arrival'] ) {
+			foreach ( NanoPost_Email_Check_Log::all() as $row ) {
+				if ( $test['test_id'] === $row->test_id && isset( $row->canary['arrival'] ) && in_array( $row->canary['arrival'], array( 'arrived', 'missing' ), true ) ) {
+					return;
+				}
+			}
+		}
 		$fields = $test;
 		unset( $fields['test_id'], $fields['sent_at'] );
 		$fields['fetched_at'] = time();
@@ -574,7 +583,9 @@ class NanoPost_Email_Check_Canary {
 		return '.nanopost-email-check-auth{display:inline-block;padding:0 6px;margin:2px 2px 2px 0;border-radius:3px;border:1px solid;font-size:12px;line-height:1.8;white-space:nowrap}'
 			. '.nanopost-email-check-auth-pass{color:#00450c;background:#edfaef;border-color:#00a32a}'
 			. '.nanopost-email-check-auth-warn{color:#4d3300;background:#fcf9e8;border-color:#dba617}'
-			. '.nanopost-email-check-auth-fail{color:#8a1f1f;background:#fcf0f1;border-color:#d63638}';
+			. '.nanopost-email-check-auth-fail{color:#8a1f1f;background:#fcf0f1;border-color:#d63638}'
+			. '.nanopost-email-check-tagline{font-size:13px;font-weight:400;color:#646970;margin-left:8px}'
+			. '.nanopost-email-check-state-on span{color:#00a32a}';
 	}
 
 	// -------------------------------------------------------------------------------

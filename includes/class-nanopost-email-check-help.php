@@ -32,7 +32,8 @@ class NanoPost_Email_Check_Help {
 	const PLACE_NOTICE_FAILED = 'notice-failed';
 	const PLACE_NOTICE_STALE  = 'notice-stale';
 	const PLACE_CLI           = 'cli';
-	const PLACE_CONNECTION    = 'connection';
+	const PLACE_CANARY        = 'canary';
+	const PLACE_NOTICE_CANARY = 'notice-canary';
 	const PLACE_PROOF         = 'proof';
 
 	/**
@@ -106,13 +107,23 @@ class NanoPost_Email_Check_Help {
 	}
 
 	/**
-	 * What connecting to nanoPost does.
+	 * Anchors on the Email Canary help page. Agreed with the help pages; do not rename.
+	 */
+	const CANARY_TURN_ON = 'turn-on-email-canary';
+	const CANARY_CONFIRM = 'before-you-confirm-alerts-are-off';
+	const CANARY_CHANGE  = 'change-the-alert-address';
+	const CANARY_STOP    = 'stop-watching';
+	const CANARY_SENT    = 'what-is-sent-to-nanopost';
+
+	/**
+	 * A part of the Email Canary help page.
 	 *
-	 * @param string $place Where the link is shown.
+	 * @param string $anchor A CANARY_ constant.
+	 * @param string $place  Where the link is shown.
 	 * @return string
 	 */
-	public static function connect( $place = '' ) {
-		return self::url( 'connect/', $place );
+	public static function canary( $anchor, $place = '' ) {
+		return self::url( 'canary/', $place, $anchor );
 	}
 
 	/**
@@ -122,7 +133,7 @@ class NanoPost_Email_Check_Help {
 	 * @return string
 	 */
 	public static function proof( $place = '' ) {
-		return self::url( 'connect/', $place, 'proof-of-arrival' );
+		return self::canary( self::CANARY_TURN_ON, $place );
 	}
 
 	/**

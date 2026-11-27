@@ -130,7 +130,25 @@ class NanoPost_Email_Check_Alerts {
 			$alerts[ $problem['key'] ] = 'canary-' . $problem['type'];
 		}
 
+		$unconfirmed = self::unconfirmed();
+		if ( null !== $unconfirmed ) {
+			$alerts[ 'canary-unconfirmed:' . $unconfirmed['confirm_by'] ] = 'canary-unconfirmed';
+		}
+
 		return $alerts;
+	}
+
+	/**
+	 * The block while alerts are off until the owner confirms the alert address, or null.
+	 *
+	 * @return array|null
+	 */
+	private static function unconfirmed() {
+		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
+			return null;
+		}
+		$block = NanoPost_Email_Check_Canary::block();
+		return null !== $block && 'unconfirmed' === $block['watching'] ? $block : null;
 	}
 
 	/**
@@ -171,6 +189,8 @@ class NanoPost_Email_Check_Alerts {
 				self::render_failed( $key );
 			} elseif ( 'stale' === $type ) {
 				self::render_stale( $key );
+			} elseif ( 'canary-unconfirmed' === $type ) {
+				self::render_unconfirmed( $key );
 			} else {
 				self::render_canary( $key );
 			}
@@ -192,7 +212,7 @@ class NanoPost_Email_Check_Alerts {
 				/* translators: 1: date and time, 2: email address. */
 				__( 'On %1$s, WordPress could not send the test email to %2$s. Your site may not be able to send email.', 'nanopost-email-check' ),
 				NanoPost_Email_Check_Admin::format_date( $result->time ),
-				$result->recipient
+				NanoPost_Email_Check_Admin::recipient_label( $result )
 			)
 		);
 		echo '</p><p>' . esc_html__( 'Error:', 'nanopost-email-check' ) . ' <code>' . esc_html( $result->error_message() ) . '</code></p>';
@@ -227,6 +247,22 @@ class NanoPost_Email_Check_Alerts {
 			self::render_links( $key, '' === $problem['help_url'] ? array() : array( $problem['help_url'] => __( 'What to do', 'nanopost-email-check' ) ) );
 			echo '</div>';
 		}
+	}
+
+	/**
+	 * Notice that stays until the confirm: alerts are off.
+	 *
+	 * @param string $key Alert key.
+	 */
+	private static function render_unconfirmed( $key ) {
+		$block = self::unconfirmed();
+		echo '<div class="notice notice-warning nanopost-email-check-notice-unconfirmed"><p><strong>';
+		echo esc_html__( 'Email Canary: alerts are OFF until you confirm.', 'nanopost-email-check' ) . '</strong> ';
+		/* translators: %s: email address. */
+		echo esc_html( sprintf( __( 'We sent an email to %s.', 'nanopost-email-check' ), NanoPost_Email_Check_Admin::alert_address( $block ) ) );
+		echo '</p>';
+		self::render_links( $key, array( NanoPost_Email_Check_Help::canary( NanoPost_Email_Check_Help::CANARY_CONFIRM, NanoPost_Email_Check_Help::PLACE_NOTICE_CANARY ) => __( 'Why confirm', 'nanopost-email-check' ) ) );
+		echo '</div>';
 	}
 
 	/**

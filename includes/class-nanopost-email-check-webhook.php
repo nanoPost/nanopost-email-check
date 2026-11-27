@@ -109,13 +109,22 @@ class NanoPost_Email_Check_Webhook {
 	 */
 	public static function payload( NanoPost_Email_Check_Result $result, $url ) {
 		$site = home_url();
+		$name = self::site_name();
+		$mail = 'wp_mail' === $result->check;
 
+		// "[Email Check]" says which part speaks; "[Email Canary]" messages come from nanoPost.
 		if ( $result->passed ) {
-			/* translators: %s: site address. */
-			$text = sprintf( __( 'Email check passed again on %s.', 'nanopost-email-check' ), $site );
+			$text = $mail
+				/* translators: %s: site address without https://. */
+				? sprintf( __( '[Email Check] %s can send its test email again.', 'nanopost-email-check' ), $name )
+				/* translators: %s: site address without https://. */
+				: sprintf( __( '[Email Check] A check passed again on %s.', 'nanopost-email-check' ), $name );
 		} else {
-			/* translators: 1: site address, 2: error text. */
-			$text = sprintf( __( 'Email check failed on %1$s: %2$s', 'nanopost-email-check' ), $site, self::escape_markup( $result->error_message() ) );
+			$text = $mail
+				/* translators: 1: site address without https://, 2: error text. */
+				? sprintf( __( '[Email Check] %1$s could not send its test email: %2$s', 'nanopost-email-check' ), $name, self::escape_markup( $result->error_message() ) )
+				/* translators: 1: site address without https://, 2: error text. */
+				: sprintf( __( '[Email Check] A check failed on %1$s: %2$s', 'nanopost-email-check' ), $name, self::escape_markup( $result->error_message() ) );
 		}
 
 		if ( self::is_google_chat( $url ) ) {
@@ -129,6 +138,15 @@ class NanoPost_Email_Check_Webhook {
 			'error'  => $result->passed ? '' : $result->error_message(),
 			'time'   => gmdate( 'c', $result->time ),
 		);
+	}
+
+	/**
+	 * The site address without the scheme and trailing slash, as messages name the site.
+	 *
+	 * @return string
+	 */
+	public static function site_name() {
+		return (string) preg_replace( '#^https?://#i', '', untrailingslashit( home_url() ) );
 	}
 
 	/**
@@ -164,8 +182,8 @@ class NanoPost_Email_Check_Webhook {
 	 */
 	public static function test_payload( $url ) {
 		$site = home_url();
-		/* translators: %s: site address. */
-		$text = sprintf( __( 'Test alert from Email Check on %s. This is only a test of the webhook. No check failed.', 'nanopost-email-check' ), $site );
+		/* translators: %s: site address without https://. */
+		$text = sprintf( __( '[Email Check] Test alert from %s. This is only a test of the webhook. No check failed.', 'nanopost-email-check' ), self::site_name() );
 
 		if ( self::is_google_chat( $url ) ) {
 			return array( 'text' => $text );

@@ -61,8 +61,8 @@ class NanoPost_Email_Check_CLI {
 	 *     Success: WordPress accepted the test email for owner@example.com. Check that inbox (and the spam folder) to confirm it arrived.
 	 */
 	public function run() {
-		if ( NanoPost_Email_Check_Connection::is_connected() ) {
-			WP_CLI::log( __( 'Sending a test email to nanoPost ...', 'nanopost-email-check' ) );
+		if ( NanoPost_Email_Check_Connection::canary_active() ) {
+			WP_CLI::log( __( 'Sending a test email to Email Canary ...', 'nanopost-email-check' ) );
 		} else {
 			/* translators: %s: recipient email address. */
 			WP_CLI::log( sprintf( __( 'Sending a test email to %s ...', 'nanopost-email-check' ), NanoPost_Email_Check_Settings::recipient() ) );
@@ -84,14 +84,14 @@ class NanoPost_Email_Check_CLI {
 			$check_url = NanoPost_Email_Check_Connection::get()['check_url'];
 			WP_CLI::success(
 				sprintf(
-					/* translators: 1: test ID, 2: URL of the check in nanoPost. */
-					__( 'WordPress accepted the test email for nanoPost (test %1$s). See whether it arrived: %2$s', 'nanopost-email-check' ),
+					/* translators: 1: test ID, 2: URL of the site's page in nanoPost. */
+					__( 'WordPress accepted the test email for Email Canary (test %1$s). Its arrival shows on the plugin screen, and in nanoPost: %2$s', 'nanopost-email-check' ),
 					$results[0]->test_id,
-					'' !== $check_url ? $check_url : __( 'the check page in nanoPost', 'nanopost-email-check' )
+					'' !== $check_url ? $check_url : __( 'the site\'s page in nanoPost', 'nanopost-email-check' )
 				)
 			);
 			if ( NanoPost_Email_Check_Result::ANNOUNCE_OK !== $results[0]->announce ) {
-				WP_CLI::warning( __( 'The plugin could not tell nanoPost about this test. nanoPost still records the email if it arrives.', 'nanopost-email-check' ) );
+				WP_CLI::warning( __( 'The plugin could not tell Email Canary about this test. Email Canary still records the email if it arrives.', 'nanopost-email-check' ) );
 			}
 			return;
 		}
@@ -301,8 +301,15 @@ class NanoPost_Email_Check_CLI {
 			$calls = 'on';
 		}
 
+		$block = $connected ? NanoPost_Email_Check_Canary::block() : null;
+
 		return array(
 			'connected'        => $connected,
+			'watching'         => null === $block ? null : $block['watching'],
+			'stopped_reason'   => null === $block || '' === $block['stopped_reason'] ? null : $block['stopped_reason'],
+			'arrival'          => null === $block ? null : $block['arrival'],
+			'last_arrival_at'  => null === $block || null === $block['last_arrival'] || 0 === $block['last_arrival']['received_at'] ? null : self::iso_time( $block['last_arrival']['received_at'] ),
+			'alerts_to'        => null === $block ? array() : $block['alerts_to'],
 			'address'          => $connected ? $conn['address'] : null,
 			'check_url'        => $connected && '' !== $conn['check_url'] ? $conn['check_url'] : null,
 			'calls'            => $calls,
@@ -503,15 +510,28 @@ class NanoPost_Email_Check_CLI {
 
 		$np = $data['nanopost'];
 		if ( ! $np['connected'] ) {
-			$text = __( 'Not connected. Connect on the plugin screen (Tools > Email Check).', 'nanopost-email-check' );
+			$text = __( 'Off. Turn it on on the plugin screen (Tools > Email Check).', 'nanopost-email-check' );
 			if ( null !== $np['ended'] ) {
 				$text .= ' ' . ( NanoPost_Email_Check_Connection::ENDED_SITE_CHANGED === $np['ended']
-					? __( 'The last connection ended because the site address changed.', 'nanopost-email-check' )
-					: __( 'The last connection was ended in nanoPost.', 'nanopost-email-check' ) );
+					? __( 'It turned off because the site address changed.', 'nanopost-email-check' )
+					: __( 'nanoPost ended it for this site.', 'nanopost-email-check' ) );
 			}
 		} else {
-			/* translators: %s: the check's email address in nanoPost. */
-			$text = sprintf( __( 'Connected. Test emails go to %s.', 'nanopost-email-check' ), $np['address'] );
+			$states = array(
+				'on'          => __( 'On.', 'nanopost-email-check' ),
+				'unconfirmed' => __( 'Alerts are OFF until you confirm the alert address.', 'nanopost-email-check' ),
+				'over_limit'  => __( 'Alerts are OFF: the nanoPost account has reached its limit of sites.', 'nanopost-email-check' ),
+				'stopped'     => __( 'Off.', 'nanopost-email-check' ),
+			);
+			$text   = null === $np['watching'] ? __( 'On. No state from nanoPost yet.', 'nanopost-email-check' ) : ( isset( $states[ $np['watching'] ] ) ? $states[ $np['watching'] ] : NanoPost_Email_Check_Canary::open_text() );
+			if ( array() !== $np['alerts_to'] ) {
+				/* translators: %s: email addresses. */
+				$text .= ' ' . sprintf( __( 'Alerts go to %s.', 'nanopost-email-check' ), implode( ', ', wp_list_pluck( $np['alerts_to'], 'email' ) ) );
+			}
+			if ( null !== $np['last_arrival_at'] ) {
+				/* translators: %s: date and time. */
+				$text .= ' ' . sprintf( __( 'Last test email arrived %s.', 'nanopost-email-check' ), NanoPost_Email_Check_Admin::format_time( self::unix_time( $np['last_arrival_at'] ) ) );
+			}
 			if ( 'stopped_too_old' === $np['calls'] ) {
 				$text .= ' ' . $np['message'];
 			} elseif ( 'waiting' === $np['calls'] ) {
@@ -519,9 +539,9 @@ class NanoPost_Email_Check_CLI {
 				$text .= ' ' . sprintf( __( 'Calls wait until %s.', 'nanopost-email-check' ), NanoPost_Email_Check_Admin::format_time( self::unix_time( $np['retry_until'] ) ) );
 			}
 		}
-		$add( __( 'nanoPost', 'nanopost-email-check' ), $text );
+		$add( __( 'Email Canary', 'nanopost-email-check' ), $text );
 		if ( null !== $np['check_url'] ) {
-			$add( __( 'Check in nanoPost', 'nanopost-email-check' ), $np['check_url'] );
+			$add( __( 'Open in nanoPost', 'nanopost-email-check' ), $np['check_url'] );
 		}
 
 		return $rows;
