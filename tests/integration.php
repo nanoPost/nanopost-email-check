@@ -708,7 +708,7 @@ NanoPost_Email_Check_Admin::render();
 $np_html = ob_get_clean();
 remove_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_bad_settings );
 
-np_assert( false !== strpos( $np_html, 'Recent tests' ) && false !== strpos( $np_html, 'Email check failed.' ), 'screen and notice rendered' );
+np_assert( false !== strpos( $np_html, 'Recent tests' ) && false !== strpos( $np_html, 'Email Check: this site could not send its test email.' ), 'screen and notice rendered' );
 // Parse the HTML as a browser would, and look for what the hostile text tried to create.
 $np_dom = new DOMDocument();
 libxml_use_internal_errors( true );

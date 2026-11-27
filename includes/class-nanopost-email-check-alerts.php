@@ -235,7 +235,7 @@ class NanoPost_Email_Check_Alerts {
 		$result = self::failed_result();
 
 		echo '<div id="nanopost-email-check-notice-failed" class="notice notice-error"><p>';
-		echo '<strong>' . esc_html__( 'Email check failed.', 'nanopost-email-check' ) . '</strong> ';
+		echo '<strong>' . esc_html__( 'Email Check: this site could not send its test email.', 'nanopost-email-check' ) . '</strong> ';
 		echo esc_html(
 			sprintf(
 				/* translators: 1: date and time, 2: email address. */
@@ -317,11 +317,11 @@ class NanoPost_Email_Check_Alerts {
 	 */
 	private static function render_stale( $key ) {
 		echo '<div id="nanopost-email-check-notice-stale" class="notice notice-warning"><p>';
-		echo '<strong>' . esc_html__( 'Email checks have stopped.', 'nanopost-email-check' ) . '</strong> ';
+		echo '<strong>' . esc_html__( 'Email Check: scheduled tests have stopped.', 'nanopost-email-check' ) . '</strong> ';
 		echo esc_html(
 			sprintf(
 				/* translators: %s: date and time. */
-				__( 'No scheduled email check has finished since %s. WP-Cron may not be running on this site, or the check may be stopping with a PHP error.', 'nanopost-email-check' ),
+				__( 'No scheduled test has finished since %s. WP-Cron may not be running on this site, or the test may be stopping with a PHP error.', 'nanopost-email-check' ),
 				NanoPost_Email_Check_Admin::format_date( (int) self::stale_since() )
 			)
 		);
