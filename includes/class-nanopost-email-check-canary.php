@@ -593,7 +593,16 @@ class NanoPost_Email_Check_Canary {
 			. '.nanopost-email-check-auth-warn{color:#4d3300;background:#fcf9e8;border-color:#dba617}'
 			. '.nanopost-email-check-auth-fail{color:#8a1f1f;background:#fcf0f1;border-color:#d63638}'
 			. '.nanopost-email-check-tagline{font-size:13px;font-weight:400;color:#646970;margin-left:8px}'
-			. '.nanopost-email-check-state-on span{color:#00a32a}';
+			. '.nanopost-email-check-state-on span{color:#00a32a}'
+			. '#nanopost-email-check-status,#nanopost-email-check-connection{background:#fff;border:1px solid #c3c4c7;border-radius:4px;padding:4px 20px 16px;margin:16px 0;max-width:960px;box-sizing:border-box}'
+			. '#nanopost-email-check-status .form-table th,#nanopost-email-check-connection .form-table th{padding:10px 10px 10px 0;width:180px}'
+			. '#nanopost-email-check-status .form-table td,#nanopost-email-check-connection .form-table td{padding:10px 10px}'
+			. '.nanopost-email-check-change{margin-left:12px;vertical-align:middle}'
+			. '.nanopost-email-check-change summary{cursor:pointer;color:#2271b1}'
+			. '.nanopost-email-check-canary-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:8px}'
+			. '.nanopost-email-check-canary-actions form{margin:0}'
+			. '.nanopost-email-check-resend{display:inline-flex;align-items:center;gap:8px;margin:0 8px 8px 0;vertical-align:middle}'
+			. '.nanopost-email-check-resend .description{margin:0}';
 	}
 
 	// -------------------------------------------------------------------------------

@@ -958,7 +958,8 @@ class NanoPost_Email_Check_Admin {
 
 		echo '<table class="form-table" role="presentation"><tbody>';
 		$arrival = $block['last_arrival'];
-		echo '<tr><th scope="row">' . esc_html__( 'Last test', 'nanopost-email-check' ) . '</th><td>';
+		$label   = 'missing' === $block['arrival'] ? __( 'Last arrival', 'nanopost-email-check' ) : __( 'Last test', 'nanopost-email-check' );
+		echo '<tr><th scope="row">' . esc_html( $label ) . '</th><td>';
 		if ( null === $arrival || 0 === $arrival['received_at'] ) {
 			esc_html_e( 'No test email has arrived yet.', 'nanopost-email-check' );
 		} else {
@@ -1088,7 +1089,7 @@ class NanoPost_Email_Check_Admin {
 			echo '<p>' . esc_html__( 'Email Canary: we cannot send another confirm email now. Try again tomorrow. Proof of arrival still works.', 'nanopost-email-check' ) . '</p>';
 			return;
 		}
-		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="nanopost-email-check-resend" style="display:inline-block;margin-right:8px;">';
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="nanopost-email-check-resend">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::ALERT_EMAIL_ACTION ) . '" />';
 		echo '<input type="hidden" name="alert_email" value="' . esc_attr( $address ) . '" />';
 		wp_nonce_field( self::ALERT_EMAIL_ACTION );
@@ -1132,7 +1133,7 @@ class NanoPost_Email_Check_Admin {
 	private static function render_canary_actions( $off, $block = null ) {
 		echo '<div class="nanopost-email-check-canary-actions">';
 		if ( $off ) {
-			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:12px;">';
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 			echo '<input type="hidden" name="action" value="' . esc_attr( self::TURN_OFF_ACTION ) . '" />';
 			wp_nonce_field( self::TURN_OFF_ACTION );
 			submit_button( __( 'Turn Email Canary off', 'nanopost-email-check' ), 'secondary', 'submit', false );

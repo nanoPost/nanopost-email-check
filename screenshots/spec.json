@@ -248,6 +248,195 @@
 			"to": "#nanopost-email-check-proof",
 			"caption": "Proof of arrival after Send test now.",
 			"alt": "The proof of arrival box: the test email arrived at nanoPost, with SPF, DKIM and DMARC pass, and links to the check and to help."
+		},
+		{
+			"id": "canary-offer",
+			"out": "screenshots/help/canary-offer.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary offer"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "The Email Canary area before it is on.",
+			"alt": "The Email Canary area: a short offer, the field Send alerts to with you@example.com, the button Turn on Email Canary, the text of what the site sends, and links to what is sent, the terms and the privacy policy."
+		},
+		{
+			"id": "canary-on",
+			"out": "screenshots/help/canary-on.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary on"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "Email Canary is on.",
+			"alt": "The Email Canary area: Email Canary is on, the last test arrived with SPF and DMARC passed and DKIM not signed, the next test is expected by a time, alerts go to you@example.com with a Change link, the webhook, and the button Turn Email Canary off."
+		},
+		{
+			"id": "canary-unconfirmed",
+			"out": "screenshots/help/canary-unconfirmed.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary unconfirmed"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "Alerts are off until you confirm.",
+			"alt": "The Email Canary area: Alerts are OFF until you confirm, we sent an email to you@example.com, the time when the 24 hours end, and the Resend and Change controls."
+		},
+		{
+			"id": "canary-change",
+			"out": "screenshots/help/canary-change.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary change"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "A new alert address waits for its confirm.",
+			"alt": "The Email Canary area: alerts go to you@example.com, and the text Waiting for the confirm of new@example.com."
+		},
+		{
+			"id": "canary-off",
+			"out": "screenshots/help/canary-off.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary off"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "Email Canary is off.",
+			"alt": "The Email Canary area after a turn-off: Email Canary is off, the history is kept for 30 days, and the field Send alerts to with the button Turn on Email Canary."
+		},
+		{
+			"id": "canary-failing",
+			"out": "screenshots/help/canary-failing.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary failing"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "Alerts do not reach the alert address.",
+			"alt": "The Email Canary area: alerts go to you@example.com, with the warning Email Canary: alerts do not reach you@example.com."
+		},
+		{
+			"id": "canary-problem",
+			"out": "screenshots/help/canary-problem.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary problem"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-connection",
+			"to": "#nanopost-email-check-connection",
+			"caption": "A test email that did not arrive.",
+			"alt": "The Email Canary area: the test email of a given time did not arrive; Email Check sent it, so it was probably lost or refused after that."
+		},
+		{
+			"id": "canary-log",
+			"out": "screenshots/help/canary-log.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary on"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#nanopost-email-check-log",
+			"to": "#nanopost-email-check-log",
+			"caption": "Recent tests, with the Email Check and Email Canary columns.",
+			"alt": "A table of recent tests: each row shows whether WordPress sent the test email and, for the newest ones, whether it arrived at nanoPost with its SPF, DKIM and DMARC labels."
+		},
+		{
+			"id": "canary-screen",
+			"out": "screenshots/help/canary-screen.webp",
+			"width": 1000,
+			"path": "/wp-admin/tools.php?page=nanopost-email-check",
+			"setup": [
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary on"
+			],
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			],
+			"hide": [
+				"#wpadminbar"
+			],
+			"from": "#wpbody-content .wrap h1",
+			"to": "#nanopost-email-check-settings",
+			"caption": "The plugin screen with its two areas, Email Check and Email Canary.",
+			"alt": "The plugin screen: the Email Check area with the last test, how the site sends, the schedule and the Send test now button; the Email Canary area with its state; and the settings."
 		}
 	]
 }
