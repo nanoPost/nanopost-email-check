@@ -189,6 +189,13 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 
 == Changelog ==
 
+= 1.7.0 =
+* Optional connection to nanoPost (opt-in): connect the site on the plugin screen and approve it in your browser. While connected, each test email goes to nanoPost, which records whether it arrived, with its SPF, DKIM and DMARC results, and alerts you when a test does not arrive. Nothing is sent before you connect. See "External services" for what a connected site sends.
+* Proof of arrival: after "Send test now", a connected site shows whether the test email arrived at nanoPost, with its SPF, DKIM and DMARC results.
+* While connected, the plugin's own webhook stays quiet for failures that nanoPost alerts on, and alerts only when it cannot reach nanoPost.
+* WP-CLI: `wp email-check status` shows the nanoPost connection; `wp email-check run` names the test ID and the check page.
+* Disconnect at any time on the plugin screen. Deleting the plugin also ends the connection.
+
 = 1.6.0 =
 * The recipient setting takes up to 3 addresses, separated by commas, for example your own address and a monitoring address. Each test is one email to all of them. The same rules apply on the plugin screen, in WP-CLI and in the `NANOPOST_EMAIL_CHECK_RECIPIENT` constant.
 
