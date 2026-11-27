@@ -972,14 +972,25 @@ class NanoPost_Email_Check_Admin {
 			echo '<tr><th scope="row">' . esc_html__( 'Alerts go to', 'nanopost-email-check' ) . '</th><td>';
 			$confirmed = array();
 			$pending   = array();
+			$failing   = array();
 			foreach ( $block['alerts_to'] as $entry ) {
 				if ( 'pending' === $entry['state'] ) {
 					$pending[] = $entry['email'];
-				} else {
+				} elseif ( 'confirmed' === $entry['state'] ) {
 					$confirmed[] = $entry['email'];
+				} elseif ( 'failing' === $entry['state'] ) {
+					$confirmed[] = $entry['email'];
+					$failing[]   = $entry['email'];
+				} else {
+					/* translators: 1: email address, 2: "Open nanoPost to see." */
+					$confirmed[] = sprintf( __( '%1$s (%2$s)', 'nanopost-email-check' ), $entry['email'], NanoPost_Email_Check_Canary::open_text() );
 				}
 			}
 			echo esc_html( implode( ', ', $confirmed ) );
+			foreach ( $failing as $email ) {
+				/* translators: %s: email address. */
+				echo '<br /><strong class="nanopost-email-check-failing">' . esc_html( sprintf( __( 'Email Canary: alerts do not reach %s.', 'nanopost-email-check' ), $email ) ) . '</strong>';
+			}
 			if ( array() !== $pending ) {
 				/* translators: %s: email address. */
 				echo '<br /><span class="description">' . esc_html( sprintf( __( 'Waiting for the confirm of %s. Alerts go there once it is confirmed.', 'nanopost-email-check' ), implode( ', ', $pending ) ) ) . '</span>';

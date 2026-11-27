@@ -469,6 +469,24 @@ $np_set( array( 'next_expected_by' => gmdate( 'Y-m-d\TH:i:s\Z', time() - 60 ) ) 
 $np_area = np_xpath( np_render_screen() )->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
 np_assert( false !== strpos( $np_area, 'This is the state as of' ), 'an old block says how old it is', $np_area );
 
+// An alert address state that 1.8.0 does not know, and a failing one (bounces, #63).
+$np_set(
+	array(
+		'alerts_to' => array(
+			array(
+				'email' => 'owner@example.com',
+				'state' => 'failing',
+			),
+			array(
+				'email' => 'other@example.com',
+				'state' => 'paused',
+			),
+		),
+	)
+);
+$np_area = np_xpath( np_render_screen() )->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
+np_assert( false !== strpos( $np_area, 'Email Canary: alerts do not reach owner@example.com.' ) && false !== strpos( $np_area, 'other@example.com (Open nanoPost to see.)' ), 'alert address states: "failing" says so, an unknown one says "Open nanoPost to see"', $np_area );
+
 // The cells for the other states.
 NanoPost_Email_Check_Log::update_test( $np_r->test_id, array( 'arrival' => 'unknown' ) );
 np_assert( false !== strpos( np_xpath( np_render_screen() )->query( '//td[contains(@class,"nanopost-email-check-canary-cell")]' )->item( 0 )->textContent, 'cannot tell now' ), 'log row: "cannot tell now"' );
