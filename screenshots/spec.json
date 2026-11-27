@@ -27,11 +27,16 @@
 			"width": 1280,
 			"path": "/wp-admin/tools.php?page=nanopost-email-check",
 			"setup": [
-				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main"
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
+				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php canary on"
 			],
 			"full": true,
-			"caption": "The plugin screen at Tools > Email Check: status, settings, and the result log.",
-			"alt": "The Email Check screen in wp-admin with status, settings and a table of recent results."
+			"caption": "The plugin screen at Tools > Email Check: the Email Check and Email Canary areas, the settings and the recent tests.",
+			"alt": "The plugin screen: the last test was sent, how the site sends, the schedule, Email Canary is on with the last arrival and its SPF, DKIM and DMARC labels, the settings, and the recent tests.",
+			"block": [
+				"**/assets/proof.js*",
+				"**/assets/canary.js*"
+			]
 		},
 		{
 			"id": "wporg-2",
@@ -44,7 +49,7 @@
 			"top": true,
 			"to": "#nanopost-email-check-notice-failed",
 			"pad": 24,
-			"caption": "The notice in wp-admin when a check fails, with a link to decode the error.",
+			"caption": "The notice in wp-admin when the site could not send its test email, with a link to decode the error.",
 			"alt": "A red admin notice on the Dashboard: Email check failed, with the SMTP error and links."
 		},
 		{
@@ -62,7 +67,7 @@
 			"top": true,
 			"to": "#nanopost-email-check-notice-stale",
 			"pad": 24,
-			"caption": "The notice when scheduled checks have stopped running.",
+			"caption": "The notice when scheduled tests have stopped running.",
 			"alt": "A yellow admin notice on the Dashboard: Email checks have stopped, with a WP-Cron note and links."
 		},
 		{
@@ -74,7 +79,7 @@
 			"top": true,
 			"to": "#card",
 			"pad": 56,
-			"caption": "An alert in a chat app when a check fails, sent through the optional webhook.",
+			"caption": "An alert in a chat app when the site could not send its test email, sent through the optional webhook.",
 			"alt": "A chat channel with two messages from Email Check: Email check failed on the site with SMTP Error: Could not authenticate, then Email check passed again."
 		},
 		{
@@ -90,8 +95,8 @@
 			],
 			"from": "#nanopost-email-check-status",
 			"to": "#nanopost-email-check-settings",
-			"caption": "Status and settings on the Email Check screen.",
-			"alt": "Last check passed, daily schedule, recipient field, schedule choice and a Slack webhook URL."
+			"caption": "The Email Check area, the Email Canary offer and the settings.",
+			"alt": "The Email Check area with the last test sent, how the site sends, the schedule and where test emails go; the Email Canary offer; and the settings: recipient, schedule and a Slack webhook URL."
 		},
 		{
 			"id": "help-log",
@@ -106,8 +111,8 @@
 			],
 			"from": "#nanopost-email-check-log",
 			"to": "#nanopost-email-check-log",
-			"caption": "The result log: passing checks, and a failure with its SMTP error.",
-			"alt": "A table of recent results. Two rows failed with SMTP Error: Could not authenticate; the rest passed."
+			"caption": "Recent tests: tests that were sent, and two that could not be sent, with the SMTP error.",
+			"alt": "A table of recent tests. Two rows say Could not send, with SMTP Error: Could not authenticate; the rest say Sent."
 		},
 		{
 			"id": "help-notice-failed",
@@ -122,7 +127,7 @@
 			],
 			"from": "#nanopost-email-check-notice-failed",
 			"to": "#nanopost-email-check-notice-failed",
-			"caption": "The notice when a check fails.",
+			"caption": "The notice when the site could not send its test email.",
 			"alt": "Admin notice: Email check failed, with the error text and links to the error page, the results and Dismiss."
 		},
 		{
@@ -142,7 +147,7 @@
 			],
 			"from": "#nanopost-email-check-notice-stale",
 			"to": "#nanopost-email-check-notice-stale",
-			"caption": "The notice when scheduled checks have stopped.",
+			"caption": "The notice when scheduled tests have stopped.",
 			"alt": "Admin notice: Email checks have stopped, with a DISABLE_WP_CRON note and links."
 		},
 		{
@@ -159,7 +164,7 @@
 			"from": "#wpbody-content .wrap h1",
 			"to": "#nanopost-email-check-notice-failed",
 			"pad": 16,
-			"caption": "Overview: the notice on the Dashboard when a check fails.",
+			"caption": "Overview: the notice on the Dashboard when the site could not send its test email.",
 			"alt": "The WordPress Dashboard with a red notice: Email check failed, the SMTP error, and links to the error page, the results and Dismiss."
 		},
 		{
@@ -175,7 +180,7 @@
 			],
 			"from": "#nanopost-email-check-log",
 			"to": "#nanopost-email-check-log",
-			"caption": "Overview: the result log with a failure and the recovery.",
+			"caption": "Overview: recent tests, with a failure and the recovery.",
 			"alt": "A table of recent results: daily checks passed, two failed with SMTP Error: Could not authenticate, then a manual check passed and daily checks passed again."
 		},
 		{
@@ -189,65 +194,6 @@
 			"pad": 24,
 			"caption": "Overview: the webhook alert in a chat app, for a failure and the recovery.",
 			"alt": "A chat channel with two messages from Email Check: Email check failed on the site with SMTP Error: Could not authenticate, then Email check passed again."
-		},
-		{
-			"id": "help-connect",
-			"out": "screenshots/help/connect.webp",
-			"width": 1000,
-			"path": "/wp-admin/tools.php?page=nanopost-email-check",
-			"setup": [
-				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main"
-			],
-			"hide": [
-				"#wpadminbar"
-			],
-			"from": "#nanopost-email-check-connection",
-			"to": "#nanopost-email-check-connection",
-			"caption": "Connect to nanoPost: what the site sends, before anything is sent.",
-			"alt": "The nanoPost section on the Email Check screen: what connecting adds, the list of data the site sends, a Connect to nanoPost button, and links to the terms, privacy and help."
-		},
-		{
-			"id": "help-connected",
-			"out": "screenshots/help/connected.webp",
-			"width": 1000,
-			"path": "/wp-admin/tools.php?page=nanopost-email-check",
-			"setup": [
-				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
-				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php connected"
-			],
-			"block": [
-				"**/assets/proof.js*"
-			],
-			"hide": [
-				"#wpadminbar"
-			],
-			"from": "#nanopost-email-check-connection",
-			"to": "#nanopost-email-check-connection",
-			"caption": "A connected site: tests go to nanoPost.",
-			"alt": "The nanoPost section of a connected site: the address the tests go to, a link to the check in nanoPost, and a Disconnect button."
-		},
-		{
-			"id": "help-proof",
-			"out": "screenshots/help/proof-of-arrival.webp",
-			"width": 1000,
-			"path": "/wp-admin/tools.php?page=nanopost-email-check",
-			"setup": [
-				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php main",
-				"wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php connected"
-			],
-			"block": [
-				"**/assets/proof.js*"
-			],
-			"hide": [
-				"#wpadminbar"
-			],
-			"replace": {
-				".nanopost-email-check-proof-status": "Arrived at nanoPost: November 27, 2026 9:12 am. SPF: pass. DKIM: pass. DMARC: pass."
-			},
-			"from": "#nanopost-email-check-proof",
-			"to": "#nanopost-email-check-proof",
-			"caption": "Proof of arrival after Send test now.",
-			"alt": "The proof of arrival box: the test email arrived at nanoPost, with SPF, DKIM and DMARC pass, and links to the check and to help."
 		},
 		{
 			"id": "canary-offer",
