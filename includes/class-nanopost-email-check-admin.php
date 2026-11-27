@@ -930,7 +930,7 @@ class NanoPost_Email_Check_Admin {
 		foreach ( NanoPost_Email_Check_Canary::problems( $block ) as $problem ) {
 			echo '<div class="notice notice-error inline"><p><span aria-hidden="true">&#10005;</span> <strong>' . esc_html( NanoPost_Email_Check_Canary::problem_text( $problem ) ) . '</strong>';
 			$reason = 'missing' === $problem['type'] ? NanoPost_Email_Check_Canary::reason_text( $problem['reason'] ) : __( 'Real emails from this site can be refused.', 'nanopost-email-check' );
-			if ( 'missing' === $problem['type'] && '' === $reason && 'ok' === $block['sending'] ) {
+			if ( 'missing' === $problem['type'] && '' === $reason && 'ok' === $block['sending'] && $problem['sent_at'] > 0 ) {
 				$reason = __( 'Email Check sent it, so it was probably lost or refused after that.', 'nanopost-email-check' );
 			}
 			if ( '' !== $reason ) {

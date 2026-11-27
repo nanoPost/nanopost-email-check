@@ -429,12 +429,16 @@ class NanoPost_Email_Check_Canary {
 		$test     = $block['last_test'];
 
 		if ( 'missing' === $block['arrival'] ) {
+			// An announced test that did not arrive, or no test at all ("we got no test
+			// email"): then the newest test is one that arrived, or there is none.
+			$announced  = null !== $test && 'missing' === $test['arrival'];
+			$since      = null === $block['last_arrival'] ? 0 : $block['last_arrival']['received_at'];
 			$problems[] = array(
 				'type'     => 'missing',
-				'key'      => 'canary-missing:' . ( null === $test ? $block['observed_at'] : $test['test_id'] . $test['sent_at'] ),
-				'sent_at'  => null === $test ? 0 : $test['sent_at'],
-				'reason'   => null === $test ? '' : $test['reason'],
-				'help_url' => null === $test ? '' : $test['help_url'],
+				'key'      => 'canary-missing:' . ( $announced ? $test['test_id'] . $test['sent_at'] : 'none' . $since ),
+				'sent_at'  => $announced ? $test['sent_at'] : 0,
+				'reason'   => $announced ? $test['reason'] : '',
+				'help_url' => $announced ? $test['help_url'] : '',
 			);
 		}
 
@@ -663,7 +667,7 @@ class NanoPost_Email_Check_Canary {
 				/* translators: %s: date and time the test email was sent. */
 				return sprintf( __( 'Email Canary: the test email of %s did not arrive.', 'nanopost-email-check' ), NanoPost_Email_Check_Admin::format_date( $problem['sent_at'] ) );
 			}
-			return __( 'Email Canary: the test email did not arrive.', 'nanopost-email-check' );
+			return __( 'Email Canary: we got no test email from this site.', 'nanopost-email-check' );
 		}
 		/* translators: %s: names such as "DMARC", "SPF and DMARC" or "SPF, DKIM and DMARC". */
 		return sprintf( __( 'Email Canary: the test email arrived, but did not pass %s.', 'nanopost-email-check' ), self::name_list( $problem['failing'] ) );

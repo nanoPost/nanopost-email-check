@@ -314,6 +314,21 @@ np_assert( false !== strpos( $np_html, 'Email Canary: the test email of ' . Nano
 np_assert( false !== strpos( $np_html, 'blocklist' ), 'the notice names the reason', $np_html );
 np_assert( isset( NanoPost_Email_Check_Alerts::active()[ 'canary-missing:dddddddddddd' . $np_sent ] ), 'the key changes with each new problem', NanoPost_Email_Check_Alerts::active() );
 
+$np_set(
+	array(
+		'arrival'          => 'missing',
+		'next_expected_by' => null,
+		'last_test'        => array(
+			'test_id'    => 'gggggggggggg',
+			'sent_at'    => gmdate( 'Y-m-d\TH:i:s\Z', time() - 2 * DAY_IN_SECONDS ),
+			'arrival'    => 'arrived',
+			'arrived_at' => gmdate( 'Y-m-d\TH:i:s\Z', time() - 2 * DAY_IN_SECONDS ),
+		),
+	)
+);
+$np_html = np_notices();
+np_assert( false !== strpos( $np_html, 'Email Canary: we got no test email from this site.' ) && false === strpos( $np_html, 'the test email of' ), 'nothing came (the newest test arrived): "we got no test email", never a time of a test that arrived', $np_html );
+
 $np_set( array_merge( $np_missing, array( 'receive_path' => 'unknown' ) ) );
 np_assert( array() === NanoPost_Email_Check_Canary::problems( NanoPost_Email_Check_Canary::block() ), 'our own outage: no problem, never "did not arrive"' );
 $np_set( array_merge( $np_missing, array( 'arrival' => 'unknown' ) ) );
