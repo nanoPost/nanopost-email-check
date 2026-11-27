@@ -5,7 +5,8 @@
  * Run inside wp-env:
  *   wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php <scene>
  *
- * Scenes: main, failed, stale, reset, alert (prints the webhook text as JSON). Times are relative to now, so "x ago" texts stay the
+ * Scenes: main, failed, stale, connected (a fake nanoPost connection and a proof of
+ * arrival box), reset, alert (prints the webhook text as JSON). Times are relative to now, so "x ago" texts stay the
  * same between runs on one day.
  *
  * @package NanoPost_Email_Check
@@ -18,6 +19,12 @@ if ( ! defined( 'WP_CLI' ) ) {
 }
 
 $scene = isset( $args[0] ) ? $args[0] : 'main';
+
+// No real nanoPost connection in any scene: the screenshots show fake data only.
+delete_option( NanoPost_Email_Check_Connection::OPTION );
+delete_option( NanoPost_Email_Check_Connection::NOTICE_OPTION );
+delete_option( NanoPost_Email_Check_App::LOG_OPTION );
+wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 
 if ( 'reset' === $scene ) {
 	delete_option( NanoPost_Email_Check_Log::OPTION );
@@ -140,3 +147,42 @@ update_option(
 );
 
 WP_CLI::success( "Scene $scene ready." );
+
+if ( 'connected' === $scene ) {
+	// A fake connection: the address and check link are made up. The site settings hash
+	// is current, so WP-Cron has nothing to send. The proof box shows once, after a fake
+	// "Send test now" (the shot blocks the script and sets the result text itself).
+	update_option(
+		NanoPost_Email_Check_Connection::OPTION,
+		array(
+			'token'        => 'demo-token',
+			'address'      => 'canary+demo4k7f3q9x2@nanopost.app',
+			'check_id'     => '01jd0000000000000000demo01',
+			'check_url'    => 'https://app.nanopo.st/checks/01jd0000000000000000demo01',
+			'home_url'     => home_url(),
+			'connected_at' => time() - DAY_IN_SECONDS,
+			'site_hash'    => md5( (string) wp_json_encode( NanoPost_Email_Check_App::site_body() ) ),
+		),
+		false
+	);
+	$test_id          = 'demo1a2b3c4d';
+	$result           = new NanoPost_Email_Check_Result(
+		'wp_mail',
+		'manual',
+		true,
+		'',
+		NanoPost_Email_Check_Connection::test_address( $test_id ),
+		time() - 5,
+		array(
+			'type' => 'smtp',
+			'host' => 'smtp.example.com',
+			'port' => 587,
+		)
+	);
+	$result->test_id  = $test_id;
+	$result->announce = NanoPost_Email_Check_Result::ANNOUNCE_OK;
+	NanoPost_Email_Check_Log::add( $result );
+	set_transient( 'nanopost_email_check_sent_1', 'passed', HOUR_IN_SECONDS );
+	set_transient( NanoPost_Email_Check_Admin::PROOF_PREFIX . '1', $test_id, HOUR_IN_SECONDS );
+	WP_CLI::success( 'Scene connected.' );
+}
