@@ -20,6 +20,7 @@ class NanoPost_Email_Check_Plugin {
 		NanoPost_Email_Check_Scheduler::init();
 		NanoPost_Email_Check_Webhook::init();
 		NanoPost_Email_Check_App::init();
+		NanoPost_Email_Check_Canary::init();
 
 		if ( is_admin() ) {
 			NanoPost_Email_Check_Admin::init();

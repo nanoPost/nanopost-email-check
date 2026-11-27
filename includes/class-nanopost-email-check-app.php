@@ -159,6 +159,16 @@ class NanoPost_Email_Check_App {
 	}
 
 	/**
+	 * Ask the app for the state of the canary ("GET /check"). For the plugin screen only,
+	 * through admin-ajax.
+	 *
+	 * @return array Call result.
+	 */
+	public static function check_state() {
+		return self::request( 'GET', '/check', null, self::TIMEOUT_SHORT );
+	}
+
+	/**
 	 * The body of the site settings call.
 	 *
 	 * @return array
@@ -228,7 +238,8 @@ class NanoPost_Email_Check_App {
 	 * @param bool       $auth    Send the token. Calls with the token need a connection.
 	 * @param bool       $always  Make the call also while calls are stopped (disconnect).
 	 * @return array ok (bool), code (HTTP status, 0 when no answer), error (stable code),
-	 *               message (the app's text, may be shown), body (decoded JSON array).
+	 *               message (the app's text, may be shown), body (decoded JSON array),
+	 *               date (the Date header of the answer, or '').
 	 */
 	public static function request( $method, $path, $body = null, $timeout = self::TIMEOUT_SHORT, $auth = true, $always = false ) {
 		$headers = array(
@@ -267,6 +278,7 @@ class NanoPost_Email_Check_App {
 				'error'   => 'network',
 				'message' => $response->get_error_message(),
 				'body'    => array(),
+				'date'    => '',
 			);
 			self::log( $method, $path, $result );
 			return $result;
@@ -283,6 +295,7 @@ class NanoPost_Email_Check_App {
 			'error'   => $ok ? '' : ( isset( $decoded['error'] ) && is_string( $decoded['error'] ) ? $decoded['error'] : 'http_' . $code ),
 			'message' => ! $ok && isset( $decoded['message'] ) && is_string( $decoded['message'] ) ? $decoded['message'] : '',
 			'body'    => $decoded,
+			'date'    => (string) wp_remote_retrieve_header( $response, 'date' ),
 		);
 
 		if ( $ok ) {
@@ -315,6 +328,7 @@ class NanoPost_Email_Check_App {
 			'error'   => $reason,
 			'message' => '',
 			'body'    => array(),
+			'date'    => '',
 		);
 	}
 

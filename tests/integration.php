@@ -105,6 +105,9 @@ function np_reset() {
 	delete_option( NanoPost_Email_Check_Connection::OPTION );
 	delete_option( NanoPost_Email_Check_Connection::NOTICE_OPTION );
 	delete_option( NanoPost_Email_Check_App::LOG_OPTION );
+	delete_option( NanoPost_Email_Check_Canary::OPTION );
+	delete_transient( NanoPost_Email_Check_Canary::SCREEN_LOCK );
+	wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 	delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
@@ -1081,6 +1084,7 @@ require __DIR__ . '/integration-diagnostics.php';
 require __DIR__ . '/integration-cli.php';
 require __DIR__ . '/integration-config.php';
 require __DIR__ . '/integration-app.php';
+require __DIR__ . '/integration-canary.php';
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );
@@ -1092,6 +1096,9 @@ set_transient( NanoPost_Email_Check_Admin::SEND_LOCK, 1, MINUTE_IN_SECONDS );
 set_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK, 1, MINUTE_IN_SECONDS );
 update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => array() ) );
+set_transient( NanoPost_Email_Check_Canary::SCREEN_LOCK, 1, MINUTE_IN_SECONDS );
+wp_schedule_single_event( time() + 900, NanoPost_Email_Check_Canary::FETCH_HOOK, array( 'ffffffffffff', 1 ) );
 $np_second = 0;
 if ( is_multisite() ) {
 	$np_second = (int) get_sites(
@@ -1121,6 +1128,7 @@ np_assert( false === get_transient( NanoPost_Email_Check_Admin::SEND_LOCK ), 'no
 np_assert( false === get_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK ), 'no test alert lock left' );
 np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'no dismissed-notice user option left' );
 np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'no scheduled event left' );
+np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Canary::FETCH_HOOK, array( 'ffffffffffff', 1 ) ) && false === get_transient( NanoPost_Email_Check_Canary::SCREEN_LOCK ), 'no Email Canary fetch or lock left' );
 if ( $np_second ) {
 	switch_to_blog( $np_second );
 	wp_cache_flush();

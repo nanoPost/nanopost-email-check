@@ -691,7 +691,3 @@ np_app_take();
 np_reset();
 
 // ---------------------------------------------------------------------------------------
-np_section( 'App: uninstall tells nanoPost' );
-np_reset();
-np_app_connect();
-np_app_take();

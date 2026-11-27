@@ -110,7 +110,8 @@ class NanoPost_Email_Check_Alerts {
 	/**
 	 * Active alerts, keyed by a string that changes with each new problem.
 	 *
-	 * @return array Key => type ("failed" or "stale").
+	 * @return array Key => type ("failed", "stale", or a problem of Email Canary:
+	 *               "canary-missing", "canary-auth").
 	 */
 	public static function active() {
 		$alerts = array();
@@ -125,7 +126,24 @@ class NanoPost_Email_Check_Alerts {
 			$alerts[ 'stale:' . $stale ] = 'stale';
 		}
 
+		foreach ( self::canary_problems() as $problem ) {
+			$alerts[ $problem['key'] ] = 'canary-' . $problem['type'];
+		}
+
 		return $alerts;
+	}
+
+	/**
+	 * Problems that Email Canary emails about, from the stored state. None when the site is
+	 * not connected.
+	 *
+	 * @return array[]
+	 */
+	private static function canary_problems() {
+		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
+			return array();
+		}
+		return NanoPost_Email_Check_Canary::problems( NanoPost_Email_Check_Canary::block() );
 	}
 
 	/**
@@ -151,8 +169,10 @@ class NanoPost_Email_Check_Alerts {
 
 			if ( 'failed' === $type ) {
 				self::render_failed( $key );
-			} else {
+			} elseif ( 'stale' === $type ) {
 				self::render_stale( $key );
+			} else {
+				self::render_canary( $key );
 			}
 		}
 	}
@@ -184,6 +204,29 @@ class NanoPost_Email_Check_Alerts {
 			)
 		);
 		echo '</div>';
+	}
+
+	/**
+	 * Notice for a problem that Email Canary found, with the same core sentence as its
+	 * email.
+	 *
+	 * @param string $key Alert key.
+	 */
+	private static function render_canary( $key ) {
+		foreach ( self::canary_problems() as $problem ) {
+			if ( $key !== $problem['key'] ) {
+				continue;
+			}
+			echo '<div class="notice notice-error nanopost-email-check-notice-canary"><p>';
+			echo '<strong>' . esc_html( NanoPost_Email_Check_Canary::problem_text( $problem ) ) . '</strong>';
+			$reason = 'missing' === $problem['type'] ? NanoPost_Email_Check_Canary::reason_text( $problem['reason'] ) : __( 'Real emails from this site can be refused.', 'nanopost-email-check' );
+			if ( '' !== $reason ) {
+				echo ' ' . esc_html( $reason );
+			}
+			echo '</p>';
+			self::render_links( $key, '' === $problem['help_url'] ? array() : array( $problem['help_url'] => __( 'What to do', 'nanopost-email-check' ) ) );
+			echo '</div>';
+		}
 	}
 
 	/**

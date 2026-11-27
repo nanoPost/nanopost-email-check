@@ -28,6 +28,7 @@ class NanoPost_Email_Check_Admin {
 	const DISCONNECT_ACTION = 'nanopost_email_check_disconnect';
 	const RESULT_ACTION     = 'nanopost_email_check_test_result';
 	const DISMISS_ENDED     = 'nanopost_email_check_dismiss_ended';
+	const STATE_ACTION      = 'nanopost_email_check_canary_state';
 
 	/**
 	 * Per-user transients: the connect state (60 minutes) and the test to show proof for.
@@ -48,6 +49,7 @@ class NanoPost_Email_Check_Admin {
 		add_action( 'admin_post_' . self::DISCONNECT_ACTION, array( __CLASS__, 'handle_disconnect' ) );
 		add_action( 'admin_post_' . self::DISMISS_ENDED, array( __CLASS__, 'handle_dismiss_ended' ) );
 		add_action( 'wp_ajax_' . self::RESULT_ACTION, array( __CLASS__, 'ajax_test_result' ) );
+		add_action( 'wp_ajax_' . self::STATE_ACTION, array( __CLASS__, 'ajax_canary_state' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( NANOPOST_EMAIL_CHECK_FILE ), array( __CLASS__, 'action_links' ) );
 	}
 
@@ -429,16 +431,51 @@ class NanoPost_Email_Check_Admin {
 			);
 		}
 
+		$test   = NanoPost_Email_Check_Canary::take_test_answer( $call['body'] );
 		$body   = $call['body'];
 		$fields = array();
-		foreach ( array( 'status', 'sent_at', 'arrived_at', 'spf', 'dkim', 'dmarc' ) as $key ) {
+		foreach ( array( 'sent_at', 'arrived_at' ) as $key ) {
 			$fields[ $key ] = isset( $body[ $key ] ) && is_string( $body[ $key ] ) ? $body[ $key ] : null;
 		}
-		$fields['status']    = in_array( $fields['status'], array( 'waiting', 'arrived', 'missing', 'send_failed' ), true ) ? $fields['status'] : 'waiting';
-		$arrived             = null === $fields['arrived_at'] ? false : strtotime( $fields['arrived_at'] );
-		$fields['arrived']   = false === $arrived ? null : self::format_date( $arrived );
+		foreach ( array( 'spf', 'dkim', 'dmarc' ) as $key ) {
+			$fields[ $key ] = '' === $test[ $key ] ? null : $test[ $key ];
+		}
+		$fields['status']    = in_array( $test['arrival'], NanoPost_Email_Check_Canary::ARRIVALS, true ) ? $test['arrival'] : 'waiting';
+		$fields['arrived']   = 0 === $test['arrived_at'] ? null : self::format_date( $test['arrived_at'] );
+		$fields['reason']    = NanoPost_Email_Check_Canary::reason_text( $test['reason'] );
+		$fields['help_url']  = $test['help_url'];
 		$fields['check_url'] = isset( $body['check_url'] ) && is_string( $body['check_url'] ) ? esc_url_raw( $body['check_url'], array( 'https', 'http' ) ) : NanoPost_Email_Check_Connection::get()['check_url'];
 		wp_send_json_success( $fields );
+	}
+
+	/**
+	 * The state of the canary, asked by the browser when the plugin screen opens. The
+	 * plugin calls "GET /check" at most once a minute. When the state changed, the answer
+	 * has the new HTML of the Email Canary part and of the log (escaped on the server).
+	 */
+	public static function ajax_canary_state() {
+		check_ajax_referer( self::STATE_ACTION );
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_send_json_error( array( 'error' => 'forbidden' ), 403 );
+		}
+		if ( ! NanoPost_Email_Check_Connection::is_connected() || ! NanoPost_Email_Check_Canary::refresh_for_screen() ) {
+			wp_send_json_success( array( 'changed' => false ) );
+		}
+
+		ob_start();
+		self::render_canary();
+		$canary = (string) ob_get_clean();
+		ob_start();
+		self::render_log();
+		$log = (string) ob_get_clean();
+
+		wp_send_json_success(
+			array(
+				'changed' => true,
+				'canary'  => $canary,
+				'log'     => $log,
+			)
+		);
 	}
 
 	/**
@@ -489,6 +526,7 @@ class NanoPost_Email_Check_Admin {
 		echo '<div id="nanopost-email-check-connection">';
 		self::render_connection();
 		echo '</div>';
+		self::enqueue_canary_assets();
 
 		echo '<form id="nanopost-email-check-settings" method="post" action="' . esc_url( admin_url( 'options.php' ) ) . '">';
 		settings_fields( NanoPost_Email_Check_Settings::GROUP );
@@ -654,6 +692,7 @@ class NanoPost_Email_Check_Admin {
 					'auth'        => __( 'SPF: %1$s. DKIM: %2$s. DMARC: %3$s.', 'nanopost-email-check' ),
 					'missing'     => __( 'The test email did not arrive at nanoPost in time. nanoPost alerts you about it.', 'nanopost-email-check' ),
 					'send_failed' => __( 'The site could not send the test email. See the error in the log below.', 'nanopost-email-check' ),
+					'unknown'     => __( 'Email Canary cannot tell now. Email Check sends your test emails as usual.', 'nanopost-email-check' ),
 					'unreachable' => __( 'Could not reach nanoPost. Open the check in nanoPost to see the result.', 'nanopost-email-check' ),
 					'timeout'     => __( 'No result yet. The email can still arrive: open the check in nanoPost to see the result.', 'nanopost-email-check' ),
 					'none'        => __( 'none', 'nanopost-email-check' ),
@@ -694,6 +733,10 @@ class NanoPost_Email_Check_Admin {
 		}
 		echo '</p>';
 
+		echo '<div id="nanopost-email-check-canary">';
+		self::render_canary();
+		echo '</div>';
+
 		$too_old = NanoPost_Email_Check_Connection::too_old_message();
 		if ( '' !== $too_old ) {
 			echo '<div class="notice notice-error inline"><p>' . esc_html( $too_old ) . ' ' . esc_html__( 'Until then, the plugin does not call nanoPost. Test emails still go to nanoPost.', 'nanopost-email-check' ) . '</p></div>';
@@ -708,6 +751,160 @@ class NanoPost_Email_Check_Admin {
 		submit_button( __( 'Disconnect', 'nanopost-email-check' ), 'secondary', 'submit', false );
 		echo ' <span class="description">' . esc_html__( 'Test emails then go to the address in the settings again. nanoPost stops the check and deletes it after 30 days, unless this site connects again.', 'nanopost-email-check' ) . '</span>';
 		echo '</form>';
+	}
+
+	/**
+	 * The state of the canary, from the last block the app sent. The browser asks for a
+	 * newer one when the screen opens (assets/canary.js).
+	 */
+	private static function render_canary() {
+		$block = NanoPost_Email_Check_Canary::block();
+		if ( null === $block ) {
+			echo '<p class="description">' . esc_html__( 'Email Canary: no state from nanoPost yet. It shows here after the next test email.', 'nanopost-email-check' ) . '</p>';
+			return;
+		}
+
+		if ( NanoPost_Email_Check_Canary::cannot_tell( $block ) ) {
+			echo '<p><strong>' . esc_html__( 'Email Canary cannot tell now.', 'nanopost-email-check' ) . '</strong> ' . esc_html__( 'Email Check sends your test emails as usual.', 'nanopost-email-check' ) . '</p>';
+			return;
+		}
+
+		if ( 'on' === $block['watching'] ) {
+			echo '<p><strong>' . esc_html__( 'Email Canary is on.', 'nanopost-email-check' ) . '</strong></p>';
+		} elseif ( 'unconfirmed' === $block['watching'] ) {
+			echo '<p><strong>' . esc_html__( 'Email Canary: alerts are OFF until you confirm.', 'nanopost-email-check' ) . '</strong></p>';
+		} elseif ( 'over_limit' === $block['watching'] ) {
+			echo '<p><strong>' . esc_html__( 'Email Canary: alerts are OFF. Your account has reached its limit of sites.', 'nanopost-email-check' ) . '</strong></p>';
+		} elseif ( 'stopped' === $block['watching'] ) {
+			echo '<p><strong>' . esc_html__( 'Email Canary is off.', 'nanopost-email-check' ) . '</strong></p>';
+		} else {
+			echo '<p>' . esc_html( NanoPost_Email_Check_Canary::open_text() ) . '</p>';
+		}
+
+		foreach ( NanoPost_Email_Check_Canary::problems( $block ) as $problem ) {
+			echo '<div class="notice notice-error inline"><p><strong>' . esc_html( NanoPost_Email_Check_Canary::problem_text( $problem ) ) . '</strong>';
+			$reason = 'missing' === $problem['type'] ? NanoPost_Email_Check_Canary::reason_text( $problem['reason'] ) : '';
+			if ( 'missing' === $problem['type'] && '' === $reason && 'ok' === $block['sending'] ) {
+				$reason = __( 'Email Check sent it, so it was probably lost or refused after that.', 'nanopost-email-check' );
+			}
+			if ( 'auth' === $problem['type'] ) {
+				$reason = __( 'Real emails from this site can be refused.', 'nanopost-email-check' );
+			}
+			if ( '' !== $reason ) {
+				echo ' ' . esc_html( $reason );
+			}
+			if ( '' !== $problem['help_url'] ) {
+				echo ' ' . self::help_link( $problem['help_url'], __( 'What to do', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
+			}
+			echo '</p></div>';
+		}
+
+		echo '<table class="form-table" role="presentation"><tbody>';
+
+		$arrival = $block['last_arrival'];
+		echo '<tr><th scope="row">' . esc_html__( 'Last arrival', 'nanopost-email-check' ) . '</th><td>';
+		if ( null === $arrival || 0 === $arrival['received_at'] ) {
+			esc_html_e( 'No test email has arrived yet.', 'nanopost-email-check' );
+		} else {
+			echo esc_html( self::format_time( $arrival['received_at'] ) ) . '<br />' . NanoPost_Email_Check_Canary::auth_labels( $arrival ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- auth_labels() escapes.
+		}
+		echo '</td></tr>';
+
+		if ( $block['next_expected_by'] > 0 && 'on' === $block['watching'] ) {
+			echo '<tr><th scope="row">' . esc_html__( 'Next test', 'nanopost-email-check' ) . '</th><td>';
+			/* translators: %s: date and time. */
+			echo esc_html( sprintf( __( 'Expected by %s', 'nanopost-email-check' ), self::format_time( $block['next_expected_by'] ) ) );
+			echo '</td></tr>';
+		}
+
+		if ( array() !== $block['alerts_to'] ) {
+			$addresses = array();
+			foreach ( $block['alerts_to'] as $entry ) {
+				$addresses[] = 'pending' === $entry['state']
+					/* translators: %s: email address. */
+					? sprintf( __( '%s (not confirmed yet)', 'nanopost-email-check' ), $entry['email'] )
+					: $entry['email'];
+			}
+			echo '<tr><th scope="row">' . esc_html__( 'Alerts go to', 'nanopost-email-check' ) . '</th><td>' . esc_html( implode( ', ', $addresses ) ) . '</td></tr>';
+		}
+
+		echo '</tbody></table>';
+
+		if ( NanoPost_Email_Check_Canary::is_old( $block ) && $block['observed_at'] > 0 ) {
+			/* translators: %s: date and time. */
+			echo '<p class="description">' . esc_html( sprintf( __( 'This is the state as of %s. nanoPost has sent no newer one.', 'nanopost-email-check' ), self::format_date( $block['observed_at'] ) ) ) . '</p>';
+		}
+	}
+
+	/**
+	 * Styles for the SPF, DKIM and DMARC labels, and the script that asks for a newer
+	 * state when the screen opens (while connected).
+	 */
+	private static function enqueue_canary_assets() {
+		wp_register_style( 'nanopost-email-check-canary', false, array(), NANOPOST_EMAIL_CHECK_VERSION );
+		wp_enqueue_style( 'nanopost-email-check-canary' );
+		wp_add_inline_style( 'nanopost-email-check-canary', NanoPost_Email_Check_Canary::label_css() );
+
+		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
+			return;
+		}
+		wp_enqueue_script( 'nanopost-email-check-canary', plugins_url( 'assets/canary.js', NANOPOST_EMAIL_CHECK_FILE ), array(), NANOPOST_EMAIL_CHECK_VERSION, true );
+		wp_localize_script(
+			'nanopost-email-check-canary',
+			'nanopostEmailCheckCanary',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( self::STATE_ACTION ),
+				'action'  => self::STATE_ACTION,
+			)
+		);
+	}
+
+	/**
+	 * What Email Canary said about one test, for its log row.
+	 *
+	 * @param NanoPost_Email_Check_Result $result Result.
+	 * @return string HTML.
+	 */
+	private static function canary_cell( $result ) {
+		if ( '' === $result->test_id ) {
+			return '&mdash;';
+		}
+		if ( ! $result->passed ) {
+			return esc_html__( '(no email to wait for)', 'nanopost-email-check' );
+		}
+		$canary  = $result->canary;
+		$arrival = isset( $canary['arrival'] ) ? (string) $canary['arrival'] : '';
+		if ( 'arrived' === $arrival ) {
+			$time = isset( $canary['arrived_at'] ) ? (int) $canary['arrived_at'] : 0;
+			$html = '<strong style="color:#00a32a;">' . esc_html__( 'Arrived', 'nanopost-email-check' ) . '</strong>';
+			if ( $time > 0 ) {
+				$html .= ' ' . esc_html( self::format_date( $time ) );
+			}
+			$results = array();
+			foreach ( array( 'spf', 'dkim', 'dmarc' ) as $key ) {
+				$results[ $key ] = isset( $canary[ $key ] ) ? (string) $canary[ $key ] : '';
+			}
+			return $html . '<br />' . NanoPost_Email_Check_Canary::auth_labels( $results );
+		}
+		if ( 'missing' === $arrival ) {
+			$html   = '<strong style="color:#d63638;">' . esc_html__( 'Did not arrive', 'nanopost-email-check' ) . '</strong>';
+			$reason = NanoPost_Email_Check_Canary::reason_text( isset( $canary['reason'] ) ? (string) $canary['reason'] : '' );
+			if ( '' !== $reason ) {
+				$html .= '<br />' . esc_html( $reason );
+			}
+			if ( ! empty( $canary['help_url'] ) ) {
+				$html .= ' ' . self::help_link( (string) $canary['help_url'], __( 'What to do', 'nanopost-email-check' ) );
+			}
+			return $html;
+		}
+		if ( 'unknown' === $arrival ) {
+			return esc_html__( 'Email Canary cannot tell now', 'nanopost-email-check' );
+		}
+		if ( '' === $arrival || 'waiting' === $arrival ) {
+			return esc_html__( 'No result yet', 'nanopost-email-check' );
+		}
+		return esc_html( NanoPost_Email_Check_Canary::open_text() );
 	}
 
 	/**
@@ -825,6 +1022,10 @@ class NanoPost_Email_Check_Admin {
 		echo '<table class="widefat striped"><thead><tr>';
 		echo '<th scope="col">' . esc_html__( 'Time', 'nanopost-email-check' ) . '</th>';
 		echo '<th scope="col">' . esc_html__( 'Result', 'nanopost-email-check' ) . '</th>';
+		$canary = array() !== array_filter( wp_list_pluck( $results, 'test_id' ) );
+		if ( $canary ) {
+			echo '<th scope="col">' . esc_html__( 'Email Canary', 'nanopost-email-check' ) . '</th>';
+		}
 		echo '<th scope="col">' . esc_html__( 'Started by', 'nanopost-email-check' ) . '</th>';
 		echo '<th scope="col">' . esc_html__( 'Sent to', 'nanopost-email-check' ) . '</th>';
 		echo '<th scope="col">' . esc_html__( 'Error', 'nanopost-email-check' ) . '</th>';
@@ -843,6 +1044,9 @@ class NanoPost_Email_Check_Admin {
 				echo '<br /><span class="description" style="overflow-wrap:anywhere;">' . esc_html( $mailer ) . '</span>';
 			}
 			echo '</td>';
+			if ( $canary ) {
+				echo '<td class="nanopost-email-check-canary-cell">' . self::canary_cell( $result ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- canary_cell() escapes.
+			}
 			echo '<td>' . esc_html( $result->trigger_label() ) . '</td>';
 			echo '<td>' . esc_html( $result->recipient ) . '</td>';
 			echo '<td>';

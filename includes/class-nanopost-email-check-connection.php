@@ -200,6 +200,7 @@ class NanoPost_Email_Check_Connection {
 			delete_option( self::NOTICE_OPTION );
 		}
 		wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
+		NanoPost_Email_Check_Canary::forget();
 		NanoPost_Email_Check_Webhook::reset_check( 'wp_mail' );
 	}
 

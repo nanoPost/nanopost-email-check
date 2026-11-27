@@ -101,6 +101,7 @@ class NanoPost_Email_Check_Scheduler {
 		if ( ! is_multisite() || ! $network_wide ) {
 			wp_clear_scheduled_hook( self::HOOK );
 			wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
+			wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 			return;
 		}
 
@@ -108,6 +109,7 @@ class NanoPost_Email_Check_Scheduler {
 			switch_to_blog( $site_id );
 			wp_clear_scheduled_hook( self::HOOK );
 			wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
+			wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 			restore_current_blog();
 		}
 	}

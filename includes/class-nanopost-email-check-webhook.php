@@ -57,6 +57,9 @@ class NanoPost_Email_Check_Webhook {
 		// owner disconnected the site in nanoPost, which then refuses mail to its address).
 		// The screen shows "Reconnect", and the next test goes to the recipient setting,
 		// where a real mail problem alerts as usual.
+		// Not when Email Canary does not watch (ANNOUNCE_UNWATCHED: not confirmed, stopped,
+		// over the limit): it sends no alert then, so the plugin's webhook alerts as when
+		// not connected.
 		if ( in_array( $result->announce, array( NanoPost_Email_Check_Result::ANNOUNCE_OK, NanoPost_Email_Check_Result::ANNOUNCE_ENDED ), true ) && ! $result->passed ) {
 			if ( '' !== $previous ) {
 				unset( $state['last_status'][ $result->check ] );

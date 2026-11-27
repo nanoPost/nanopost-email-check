@@ -66,7 +66,10 @@
 					);
 				}
 				if ( 'missing' === data.status ) {
-					return show( cfg.text.missing );
+					return show( data.reason ? cfg.text.missing + ' ' + data.reason : cfg.text.missing );
+				}
+				if ( 'unknown' === data.status ) {
+					return show( cfg.text.unknown );
 				}
 				if ( 'send_failed' === data.status ) {
 					return show( cfg.text.send_failed );
