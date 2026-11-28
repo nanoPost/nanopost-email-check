@@ -14,10 +14,11 @@ if ( ! defined( 'WP_CLI' ) ) {
 }
 
 $GLOBALS['np_key'] = '';
+// The tests decide the key, also when the dev site's wp-config.php defines the constant.
 add_filter(
 	'nanopost_email_check_account_key',
-	static function ( $key ) {
-		return '' !== $GLOBALS['np_key'] ? $GLOBALS['np_key'] : $key;
+	static function () {
+		return $GLOBALS['np_key'];
 	}
 );
 // The key connects only from a public site address; the test site may be localhost.
@@ -188,6 +189,13 @@ np_key_ok( 'over_limit' );
 NanoPost_Email_Check_Key::connect_from_constant();
 np_app_take();
 np_assert( 'over_limit' === NanoPost_Email_Check_Canary::block()['watching'] && NanoPost_Email_Check_Canary::block()['confirm_by'] > 0, 'no room: over_limit with confirm_by' );
+np_key_reset();
+add_filter( 'pre_wp_mail', '__return_true' );
+np_key_ok( 'over_limit' );
+$np_out = np_cli( 'connect --key=npk_full_cli' );
+remove_filter( 'pre_wp_mail', '__return_true' );
+np_app_take();
+np_assert( 1 === $np_out->return_code && false !== strpos( $np_out->stderr, 'alerts are OFF' ), 'connect --key with no room: alerts are off, exit 1', $np_out );
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Key: WP-CLI connect' );

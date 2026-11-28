@@ -187,7 +187,8 @@ class NanoPost_Email_Check_CLI {
 	 * confirmed. Either way, one test email goes out at once. The key is sent in this call
 	 * only, and never stored.
 	 *
-	 * Exits with 0 when Email Canary is on (or waits for the confirm), and 1 when it is not.
+	 * Exits with 0 when Email Canary is on (or waits for the confirm), and 1 when it is not,
+	 * or when its alerts are off because the nanoPost account has no room for this site.
 	 *
 	 * ## OPTIONS
 	 *
@@ -246,8 +247,7 @@ class NanoPost_Email_Check_CLI {
 		}
 		$address = NanoPost_Email_Check_Admin::alert_address( $block );
 		if ( null !== $block && 'over_limit' === $block['watching'] ) {
-			WP_CLI::warning( __( 'Email Canary: alerts are OFF. Your nanoPost account has reached its limit of sites. Remove one in nanoPost, or ask us for more.', 'nanopost-email-check' ) );
-			return;
+			WP_CLI::error( __( 'Email Canary: alerts are OFF. Your nanoPost account has reached its limit of sites. Remove one in nanoPost, or ask us for more.', 'nanopost-email-check' ) );
 		}
 		if ( null !== $block && 'unconfirmed' === $block['watching'] ) {
 			/* translators: %s: email address. */
