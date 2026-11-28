@@ -39,12 +39,14 @@ class NanoPost_Email_Check_Scheduler {
 		// On a large network the loop could time out; wp_loaded schedules each site on its next request.
 		if ( ! is_multisite() || ! $network_wide || wp_is_large_network() ) {
 			self::ensure_scheduled();
+			NanoPost_Email_Check_App::queue_start();
 			return;
 		}
 
 		foreach ( self::site_ids() as $site_id ) {
 			switch_to_blog( $site_id );
 			self::ensure_scheduled();
+			NanoPost_Email_Check_App::queue_start();
 			restore_current_blog();
 		}
 	}
@@ -98,16 +100,23 @@ class NanoPost_Email_Check_Scheduler {
 	 * @param bool $network_wide True when deactivated for the whole network.
 	 */
 	public static function deactivate( $network_wide = false ) {
+		$deadline = time() + NanoPost_Email_Check_App::DEACTIVATE_BUDGET;
 		if ( ! is_multisite() || ! $network_wide ) {
+			NanoPost_Email_Check_App::stop_on_deactivate( $deadline );
 			wp_clear_scheduled_hook( self::HOOK );
 			wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
+			wp_clear_scheduled_hook( NanoPost_Email_Check_App::START_HOOK );
+			wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 			return;
 		}
 
 		foreach ( self::site_ids() as $site_id ) {
 			switch_to_blog( $site_id );
+			NanoPost_Email_Check_App::stop_on_deactivate( $deadline );
 			wp_clear_scheduled_hook( self::HOOK );
 			wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
+			wp_clear_scheduled_hook( NanoPost_Email_Check_App::START_HOOK );
+			wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 			restore_current_blog();
 		}
 	}

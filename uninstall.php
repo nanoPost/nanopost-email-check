@@ -55,6 +55,10 @@ function nanopost_email_check_uninstall_site() {
 	delete_option( 'nanopost_email_check_connection_notice' );
 	delete_option( 'nanopost_email_check_app_log' );
 	wp_clear_scheduled_hook( 'nanopost_email_check_site_sync' );
+	delete_option( 'nanopost_email_check_canary' );
+	delete_transient( 'nanopost_email_check_canary_lock' );
+	wp_unschedule_hook( 'nanopost_email_check_fetch_test' );
+	wp_clear_scheduled_hook( 'nanopost_email_check_start' );
 	delete_option( 'nanopost_email_check_settings' );
 	delete_option( 'nanopost_email_check_log' );
 	delete_option( 'nanopost_email_check_webhook_state' );

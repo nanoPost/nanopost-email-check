@@ -43,9 +43,9 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		$time       = time();
 		$test_id    = '';
 
-		// While connected to nanoPost, the test goes only to the check's address, with a
-		// new test ID in it. The recipient setting is used again after a disconnect.
-		if ( NanoPost_Email_Check_Connection::is_connected() ) {
+		// While Email Canary is on, the test goes only to the canary address, with a new
+		// test ID in it. The recipient setting is used again when it is off.
+		if ( NanoPost_Email_Check_Connection::canary_active() ) {
 			$test_id    = NanoPost_Email_Check_Connection::new_test_id();
 			$recipient  = NanoPost_Email_Check_Connection::test_address( $test_id );
 			$recipients = array( $recipient );
@@ -84,10 +84,37 @@ class NanoPost_Email_Check_Mail_Check implements NanoPost_Email_Check_Check {
 		if ( '' !== $test_id ) {
 			$result->test_id  = $test_id;
 			$call             = NanoPost_Email_Check_App::announce( $test_id, $time, $trigger, $sent, $sent ? '' : NanoPost_Email_Check_App::announce_error( $error, $cause ) );
-			$result->announce = $call['ok'] ? NanoPost_Email_Check_Result::ANNOUNCE_OK : ( 401 === $call['code'] ? NanoPost_Email_Check_Result::ANNOUNCE_ENDED : NanoPost_Email_Check_Result::ANNOUNCE_FAILED );
+			$result->announce = self::announce_outcome( $call );
+			if ( $call['ok'] && $sent ) {
+				NanoPost_Email_Check_Canary::schedule_fetch( $test_id, $call );
+			}
 		}
 
 		return $result;
+	}
+
+	/**
+	 * What the announce answer means for the plugin's own webhook. A 2xx counts as "ok"
+	 * only when Email Canary watches (the block says "on"; an answer with no block, from
+	 * an app before the block, counts as watching). The block is stored.
+	 *
+	 * @param array $call Result of the announce call.
+	 * @return string A NanoPost_Email_Check_Result::ANNOUNCE_ constant.
+	 */
+	private static function announce_outcome( $call ) {
+		if ( 401 === $call['code'] ) {
+			return NanoPost_Email_Check_Result::ANNOUNCE_ENDED;
+		}
+		if ( 409 === $call['code'] ) {
+			return NanoPost_Email_Check_Result::ANNOUNCE_UNWATCHED;
+		}
+		if ( ! $call['ok'] ) {
+			return NanoPost_Email_Check_Result::ANNOUNCE_FAILED;
+		}
+		if ( NanoPost_Email_Check_Canary::take( $call['body'] ) && 'on' !== NanoPost_Email_Check_Canary::block()['watching'] ) {
+			return NanoPost_Email_Check_Result::ANNOUNCE_UNWATCHED;
+		}
+		return NanoPost_Email_Check_Result::ANNOUNCE_OK;
 	}
 
 	/**

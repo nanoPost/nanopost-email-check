@@ -105,6 +105,9 @@ function np_reset() {
 	delete_option( NanoPost_Email_Check_Connection::OPTION );
 	delete_option( NanoPost_Email_Check_Connection::NOTICE_OPTION );
 	delete_option( NanoPost_Email_Check_App::LOG_OPTION );
+	delete_option( NanoPost_Email_Check_Canary::OPTION );
+	delete_transient( NanoPost_Email_Check_Canary::SCREEN_LOCK );
+	wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 	delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
@@ -486,7 +489,7 @@ np_assert( 'POST' === $np_req['args']['method'], 'method is POST' );
 np_assert( 0 === strpos( $np_req['args']['headers']['Content-Type'], 'application/json' ), 'JSON content type' );
 np_assert( array( 'text', 'site', 'status', 'error', 'time' ) === array_keys( $np_body ), 'fields: text, site, status, error, time', array_keys( $np_body ) );
 np_assert( 'fail' === $np_body['status'] && home_url() === $np_body['site'], 'status fail, site is home URL', $np_body );
-np_assert( 0 === strpos( $np_body['text'], 'Email check failed on ' . home_url() . ': ' ), 'fail text', $np_body['text'] );
+np_assert( 0 === strpos( $np_body['text'], '[Email Check] ' . NanoPost_Email_Check_Webhook::site_name() . ' could not send its test email: ' ), 'fail text', $np_body['text'] );
 np_assert( (bool) preg_match( '/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00$/', $np_body['time'] ), 'time is ISO 8601 UTC', $np_body['time'] );
 
 remove_filter( 'pre_wp_mail', '__return_false' );
@@ -705,7 +708,7 @@ NanoPost_Email_Check_Admin::render();
 $np_html = ob_get_clean();
 remove_filter( 'pre_option_' . NanoPost_Email_Check_Settings::OPTION, $np_bad_settings );
 
-np_assert( false !== strpos( $np_html, 'Recent results' ) && false !== strpos( $np_html, 'Email check failed.' ), 'screen and notice rendered' );
+np_assert( false !== strpos( $np_html, 'Recent tests' ) && false !== strpos( $np_html, 'Email Check: this site could not send its test email.' ), 'screen and notice rendered' );
 // Parse the HTML as a browser would, and look for what the hostile text tried to create.
 $np_dom = new DOMDocument();
 libxml_use_internal_errors( true );
@@ -855,7 +858,7 @@ np_assert( 'https://hooks.slack.com/services/T/B/x' === $np_req['url'], 'test al
 np_assert( ! empty( $np_req['args']['reject_unsafe_urls'] ), 'test alert: request is made with reject_unsafe_urls' );
 np_assert( array( 'text', 'site', 'status', 'error', 'time', 'test' ) === array_keys( $np_body ), 'test alert: the alert fields plus "test"', array_keys( $np_body ) );
 np_assert( true === $np_body['test'] && 'fail' === $np_body['status'] && home_url() === $np_body['site'], 'test alert: test is true, status fail, site is home URL', $np_body );
-np_assert( 0 === strpos( $np_body['text'], 'Test alert' ) && false !== strpos( $np_body['text'], 'No check failed' ), 'test alert: the text says it is a test', $np_body['text'] );
+np_assert( 0 === strpos( $np_body['text'], '[Email Check] Test alert' ) && false !== strpos( $np_body['text'], 'No check failed' ), 'test alert: the text says it is a test', $np_body['text'] );
 np_assert( false !== strpos( $np_body['error'], 'Test alert' ), 'test alert: the error says it is a test', $np_body['error'] );
 np_assert( 'alert-sent' === get_transient( $np_alert_notice ), 'test alert: delivered notice is set' );
 $np_state = NanoPost_Email_Check_Webhook::state();
@@ -891,7 +894,7 @@ update_option( NanoPost_Email_Check_Settings::OPTION, array( 'webhook_url' => 'h
 np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_test_alert' ) );
 delete_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK );
 $np_body = json_decode( end( $GLOBALS['np_requests'] )['args']['body'], true );
-np_assert( array( 'text' ) === array_keys( $np_body ) && 0 === strpos( $np_body['text'], 'Test alert' ), 'test alert: Google Chat gets only the text', $np_body );
+np_assert( array( 'text' ) === array_keys( $np_body ) && 0 === strpos( $np_body['text'], '[Email Check] Test alert' ), 'test alert: Google Chat gets only the text', $np_body );
 
 // Rating link: one quiet line on the plugin screen, no notice.
 $np_x    = np_xpath( np_render_screen() );
@@ -1081,6 +1084,7 @@ require __DIR__ . '/integration-diagnostics.php';
 require __DIR__ . '/integration-cli.php';
 require __DIR__ . '/integration-config.php';
 require __DIR__ . '/integration-app.php';
+require __DIR__ . '/integration-canary.php';
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );
@@ -1092,6 +1096,9 @@ set_transient( NanoPost_Email_Check_Admin::SEND_LOCK, 1, MINUTE_IN_SECONDS );
 set_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK, 1, MINUTE_IN_SECONDS );
 update_user_option( 1, NanoPost_Email_Check_Alerts::DISMISSED_META, array( 'failed:1' ) );
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => array() ) );
+set_transient( NanoPost_Email_Check_Canary::SCREEN_LOCK, 1, MINUTE_IN_SECONDS );
+wp_schedule_single_event( time() + 900, NanoPost_Email_Check_Canary::FETCH_HOOK, array( 'ffffffffffff', 1 ) );
 $np_second = 0;
 if ( is_multisite() ) {
 	$np_second = (int) get_sites(
@@ -1121,6 +1128,7 @@ np_assert( false === get_transient( NanoPost_Email_Check_Admin::SEND_LOCK ), 'no
 np_assert( false === get_transient( NanoPost_Email_Check_Admin::TEST_ALERT_LOCK ), 'no test alert lock left' );
 np_assert( false === get_user_option( NanoPost_Email_Check_Alerts::DISMISSED_META, 1 ), 'no dismissed-notice user option left' );
 np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Scheduler::HOOK ), 'no scheduled event left' );
+np_assert( false === wp_next_scheduled( NanoPost_Email_Check_Canary::FETCH_HOOK, array( 'ffffffffffff', 1 ) ) && false === get_transient( NanoPost_Email_Check_Canary::SCREEN_LOCK ), 'no Email Canary fetch or lock left' );
 if ( $np_second ) {
 	switch_to_blog( $np_second );
 	wp_cache_flush();

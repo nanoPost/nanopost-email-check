@@ -27,6 +27,33 @@ class NanoPost_Email_Check_Log {
 	}
 
 	/**
+	 * Add what Email Canary says about one test to its row. Does nothing when no row has
+	 * this test ID (for example, it is older than the last MAX results).
+	 *
+	 * @param string $test_id Test ID.
+	 * @param array  $fields  Values for the row's "canary" part.
+	 * @return bool True when a row changed.
+	 */
+	public static function update_test( $test_id, $fields ) {
+		if ( '' === $test_id ) {
+			return false;
+		}
+		$log = self::raw();
+		foreach ( $log as $index => $row ) {
+			if ( is_array( $row ) && isset( $row['test_id'] ) && $test_id === $row['test_id'] ) {
+				$old                     = isset( $row['canary'] ) && is_array( $row['canary'] ) ? $row['canary'] : array();
+				$log[ $index ]['canary'] = array_merge( $old, (array) $fields );
+				if ( $log[ $index ]['canary'] === $old ) {
+					return false;
+				}
+				update_option( self::OPTION, $log, false );
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * All results, newest first.
 	 *
 	 * @return NanoPost_Email_Check_Result[]
