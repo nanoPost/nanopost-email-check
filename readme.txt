@@ -122,7 +122,7 @@ Yes, with WP-CLI. The `wp email-check` command has these subcommands:
 
 = Can I turn on Email Canary on many sites at once? =
 
-Yes, with an account key. Make one in nanoPost (Settings, Account key), then add `define( 'NANOPOST_EMAIL_CHECK_KEY', '...' );` to `wp-config.php`, or run `wp email-check connect --key=...` on each site. Email Canary then turns on by itself, with alerts to your nanoPost account's address and no confirm email. The key only adds sites; it cannot read your account. It turns a site on once: not again after you turn it off, and not on a copy of the site at another address or on a site address that is not public. On a multisite network, the constant turns on only the main site; use WP-CLI with `--url` for the other sites.
+Yes, with an account key. Make one in nanoPost (Settings > Profile > Account key), then add `define( 'NANOPOST_EMAIL_CHECK_KEY', '...' );` to `wp-config.php`, or run `wp email-check connect --key=...` on each site. Email Canary then turns on by itself, with alerts to your nanoPost account's address and no confirm email. The key only adds sites; it cannot read your account. It turns a site on once: not again after you turn it off, and not on a copy of the site at another address or on a site address that is not public. On a multisite network, the constant turns on only the main site; use WP-CLI with `--url` for the other sites.
 
 = Does it work on multisite? =
 

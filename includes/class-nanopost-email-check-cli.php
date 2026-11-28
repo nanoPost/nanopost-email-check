@@ -192,7 +192,7 @@ class NanoPost_Email_Check_CLI {
 	 * ## OPTIONS
 	 *
 	 * [--key=<key>]
-	 * : An account key from nanoPost (Settings, Account key). With no --key and no --email,
+	 * : An account key from nanoPost (Settings > Profile > Account key). With no --key and no --email,
 	 * the key in the NANOPOST_EMAIL_CHECK_KEY constant is used.
 	 *
 	 * [--email=<email>]
