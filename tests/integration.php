@@ -108,6 +108,8 @@ function np_reset() {
 	delete_option( NanoPost_Email_Check_Canary::OPTION );
 	delete_transient( NanoPost_Email_Check_Canary::SCREEN_LOCK );
 	wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
+	delete_option( 'nanopost_email_check_key_state' );
+	wp_clear_scheduled_hook( 'nanopost_email_check_key_connect' );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_Scheduler::HOOK );
 	wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 	delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
@@ -1085,6 +1087,7 @@ require __DIR__ . '/integration-cli.php';
 require __DIR__ . '/integration-config.php';
 require __DIR__ . '/integration-app.php';
 require __DIR__ . '/integration-canary.php';
+require __DIR__ . '/integration-key.php';
 
 // ---------------------------------------------------------------------------------------
 np_section( 'Uninstall' );

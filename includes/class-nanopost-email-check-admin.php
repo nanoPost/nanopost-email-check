@@ -1049,16 +1049,47 @@ class NanoPost_Email_Check_Admin {
 		}
 
 		echo '<p>' . esc_html__( 'Email Check can tell you that WordPress sent the email. Email Canary checks that it arrived, and emails you when it does not.', 'nanopost-email-check' ) . '</p>';
+		self::render_key_line();
 		if ( ! self::site_is_public() ) {
 			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site address is not public. Test emails from it may never leave the server.', 'nanopost-email-check' ) . '</p></div>';
 		}
 		self::render_turn_on_form( $email, __( 'Turn on Email Canary', 'nanopost-email-check' ) );
-		echo '<p class="description nanopost-email-check-consent">' . esc_html__( 'When you turn on Email Canary, this site sends to nanoPost: the site address, the alert address above, the site\'s time zone, the test interval, the webhook URL, and the versions of this plugin, WordPress and PHP. After each test it sends the test ID, the time, how the test started, and whether WordPress accepted the email, with the error text if it did not. nanoPost keeps the IP address of each call for 30 days.', 'nanopost-email-check' ) . '</p>';
+		echo '<p class="description nanopost-email-check-consent">' . esc_html__( 'When you turn on Email Canary, this site sends to nanoPost: the site address, the alert address above, the site\'s time zone, the test interval, the webhook URL, and the versions of this plugin, WordPress and PHP. After each test it sends the test ID, the time, how the test started, and whether WordPress accepted the email, with the error text if it did not. nanoPost keeps the IP address of each call for 30 days. If an account key is set, the site sends it once, to add the site to that nanoPost account.', 'nanopost-email-check' ) . '</p>';
 		echo '<p>' . self::help_link( NanoPost_Email_Check_Help::canary( NanoPost_Email_Check_Help::CANARY_SENT, NanoPost_Email_Check_Help::PLACE_CANARY ), __( 'What is sent to nanoPost', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 		echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::TERMS_URL, __( 'Terms', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 		echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::PRIVACY_URL, __( 'Privacy', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 		echo ' &middot; ' . self::help_link( NanoPost_Email_Check_Help::canary( NanoPost_Email_Check_Help::CANARY_TURN_ON, NanoPost_Email_Check_Help::PLACE_CANARY ), __( 'How Email Canary works', 'nanopost-email-check' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in help_link().
 		echo '</p>';
+	}
+
+	/**
+	 * One line while an account key is set in wp-config.php: what it does on this site, or
+	 * why it does not.
+	 */
+	private static function render_key_line() {
+		if ( '' === NanoPost_Email_Check_Key::constant_key() ) {
+			return;
+		}
+		$error = NanoPost_Email_Check_Key::error();
+		if ( '' !== $error ) {
+			echo '<div class="notice notice-error inline nanopost-email-check-key"><p>' . esc_html( NanoPost_Email_Check_Key::error_text( $error ) ) . '</p></div>';
+			return;
+		}
+		switch ( NanoPost_Email_Check_Key::blocked_reason() ) {
+			case 'not_public':
+				$text = __( 'An account key is set in wp-config.php, but this site address is not public, so the key does not turn Email Canary on by itself.', 'nanopost-email-check' );
+				break;
+			case 'not_main_site':
+				$text = __( 'An account key is set in wp-config.php. On a network it turns Email Canary on only for the main site. For this site, use WP-CLI: wp email-check connect --key=<key> --url=<site address>', 'nanopost-email-check' );
+				break;
+			case 'tried':
+			case 'ended':
+				$text = __( 'An account key is set in wp-config.php. It does not turn Email Canary on by itself again for this site address. Use the button below.', 'nanopost-email-check' );
+				break;
+			default:
+				$text = __( 'An account key is set in wp-config.php. Email Canary turns on by itself in a moment, with alerts to the address of the nanoPost account.', 'nanopost-email-check' );
+		}
+		echo '<p class="description nanopost-email-check-key">' . esc_html( $text ) . '</p>';
 	}
 
 	/**

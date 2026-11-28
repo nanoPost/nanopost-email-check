@@ -74,20 +74,30 @@ class NanoPost_Email_Check_App {
 	 * "Turn on Email Canary": make the canary with the token the plugin made, and store the
 	 * connection. The owner's click (admin-post) or WP-CLI.
 	 *
-	 * @param string $email Alert address.
+	 * With an account key in place of the address (#58), the canary watches at once, with
+	 * alerts to the account's address. Exactly one of the two is sent. The key is sent in
+	 * this call only, and never stored.
+	 *
+	 * @param string $email Alert address, or '' with a key.
+	 * @param string $key   Account key, or ''.
 	 * @return array Call result (see request()). error "bad_answer" when the answer lacks
 	 *               a valid canary address; "connected" when a connection already exists.
 	 */
-	public static function connect( $email ) {
-		$token = NanoPost_Email_Check_Connection::begin( $email );
+	public static function connect( $email, $key = '' ) {
+		$identity = '' !== $key ? 'key:' . NanoPost_Email_Check_Key::fingerprint( $key ) : (string) $email;
+		$token    = NanoPost_Email_Check_Connection::begin( $identity, '' === $key ? (string) $email : '' );
 		if ( '' === $token ) {
 			return self::not_sent( 'connected' );
 		}
 		$body = self::site_body();
 		$hash = md5( (string) wp_json_encode( $body ) );
 
-		$body['alert_email'] = (string) $email;
-		$result              = self::request( 'POST', '/connect', $body, self::TIMEOUT_LONG, true, false, $token );
+		if ( '' !== $key ) {
+			$body['account_key'] = (string) $key;
+		} else {
+			$body['alert_email'] = (string) $email;
+		}
+		$result = self::request( 'POST', '/connect', $body, self::TIMEOUT_LONG, true, false, $token );
 
 		if ( $result['ok'] && ! NanoPost_Email_Check_Connection::save_from_connect( $result['body'], $hash ) ) {
 			$result['ok']    = false;
