@@ -59,7 +59,7 @@ A successful check does not confirm delivery. Check the recipient mailbox to mak
 
 The plugin screen is at **Tools > Email Check**.
 
-Free. No paid version.
+The plugin is free, with no paid version. Email Canary, the optional service, is free in this early period.
 
 Full documentation: [nanopo.st/email-check-plugin](https://nanopo.st/email-check-plugin/). Source code: [GitHub](https://github.com/nanoPost/nanopost-email-check).
 
