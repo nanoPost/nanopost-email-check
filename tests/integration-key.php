@@ -234,6 +234,7 @@ np_key_reset();
 $GLOBALS['np_key'] = 'npk_screen';
 np_assert( false !== strpos( np_render_screen(), 'An account key is set in wp-config.php. Email Canary turns on by itself in a moment' ), 'a key, not on yet: one line on the screen' );
 np_assert( false === strpos( np_render_screen(), 'npk_screen' ), 'the screen never shows the key' );
+np_assert( 1 === np_xpath( np_render_screen() )->query( '//p[contains(@class,"nanopost-email-check-key")]//a[contains(@href,"/email-check-plugin/canary/") and contains(@href,"#turn-on-with-an-account-key")]' )->length, 'the key line links to the help page' );
 np_assert( false !== strpos( np_render_screen(), 'If an account key is set, the site sends it once' ), 'the consent text names the key' );
 if ( is_multisite() ) {
 	$np_other = (int) get_sites(

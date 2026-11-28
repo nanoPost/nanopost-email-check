@@ -1070,9 +1070,10 @@ class NanoPost_Email_Check_Admin {
 		if ( '' === NanoPost_Email_Check_Key::constant_key() ) {
 			return;
 		}
+		$link  = ' ' . self::help_link( NanoPost_Email_Check_Help::canary( NanoPost_Email_Check_Help::CANARY_KEY, NanoPost_Email_Check_Help::PLACE_CANARY ), __( 'How the account key works', 'nanopost-email-check' ) );
 		$error = NanoPost_Email_Check_Key::error();
 		if ( '' !== $error ) {
-			echo '<div class="notice notice-error inline nanopost-email-check-key"><p>' . esc_html( NanoPost_Email_Check_Key::error_text( $error ) ) . '</p></div>';
+			echo '<div class="notice notice-error inline nanopost-email-check-key"><p>' . esc_html( NanoPost_Email_Check_Key::error_text( $error ) ) . $link . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $link is escaped in help_link().
 			return;
 		}
 		switch ( NanoPost_Email_Check_Key::blocked_reason() ) {
@@ -1089,7 +1090,7 @@ class NanoPost_Email_Check_Admin {
 			default:
 				$text = __( 'An account key is set in wp-config.php. Email Canary turns on by itself in a moment, with alerts to the address of the nanoPost account.', 'nanopost-email-check' );
 		}
-		echo '<p class="description nanopost-email-check-key">' . esc_html( $text ) . '</p>';
+		echo '<p class="description nanopost-email-check-key">' . esc_html( $text ) . $link . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $link is escaped in help_link().
 	}
 
 	/**
