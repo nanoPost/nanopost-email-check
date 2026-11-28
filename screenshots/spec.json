@@ -50,7 +50,7 @@
 			"to": "#nanopost-email-check-notice-failed",
 			"pad": 24,
 			"caption": "The notice in wp-admin when the site could not send its test email, with a link to decode the error.",
-			"alt": "A red admin notice on the Dashboard: Email check failed, with the SMTP error and links."
+			"alt": "A red admin notice on the Dashboard: Email Check: this site could not send its test email, with the SMTP error and links."
 		},
 		{
 			"id": "wporg-3",
@@ -68,7 +68,7 @@
 			"to": "#nanopost-email-check-notice-stale",
 			"pad": 24,
 			"caption": "The notice when scheduled tests have stopped running.",
-			"alt": "A yellow admin notice on the Dashboard: Email checks have stopped, with a WP-Cron note and links."
+			"alt": "A yellow admin notice on the Dashboard: Email Check: scheduled tests have stopped, with a WP-Cron note and links."
 		},
 		{
 			"id": "wporg-4",
@@ -80,7 +80,7 @@
 			"to": "#card",
 			"pad": 56,
 			"caption": "An alert in a chat app when the site could not send its test email, sent through the optional webhook.",
-			"alt": "A chat channel with two messages from Email Check: Email check failed on the site with SMTP Error: Could not authenticate, then Email check passed again."
+			"alt": "A chat channel with two messages from Email Check: example.com could not send its test email, with SMTP Error: Could not authenticate, then example.com can send its test email again."
 		},
 		{
 			"id": "help-status-settings",
@@ -128,7 +128,7 @@
 			"from": "#nanopost-email-check-notice-failed",
 			"to": "#nanopost-email-check-notice-failed",
 			"caption": "The notice when the site could not send its test email.",
-			"alt": "Admin notice: Email check failed, with the error text and links to the error page, the results and Dismiss."
+			"alt": "Admin notice: Email Check: this site could not send its test email, with the error text and links to the error page, the results and Dismiss."
 		},
 		{
 			"id": "help-notice-stale",
@@ -148,7 +148,7 @@
 			"from": "#nanopost-email-check-notice-stale",
 			"to": "#nanopost-email-check-notice-stale",
 			"caption": "The notice when scheduled tests have stopped.",
-			"alt": "Admin notice: Email checks have stopped, with a DISABLE_WP_CRON note and links."
+			"alt": "Admin notice: Email Check: scheduled tests have stopped, with a DISABLE_WP_CRON note and links."
 		},
 		{
 			"id": "overview-notice-failed",
@@ -165,7 +165,7 @@
 			"to": "#nanopost-email-check-notice-failed",
 			"pad": 16,
 			"caption": "Overview: the notice on the Dashboard when the site could not send its test email.",
-			"alt": "The WordPress Dashboard with a red notice: Email check failed, the SMTP error, and links to the error page, the results and Dismiss."
+			"alt": "The WordPress Dashboard with a red notice: Email Check: this site could not send its test email, the SMTP error, and links to the error page, the results and Dismiss."
 		},
 		{
 			"id": "overview-log",
@@ -181,7 +181,7 @@
 			"from": "#nanopost-email-check-log",
 			"to": "#nanopost-email-check-log",
 			"caption": "Overview: recent tests, with a failure and the recovery.",
-			"alt": "A table of recent results: daily checks passed, two failed with SMTP Error: Could not authenticate, then a manual check passed and daily checks passed again."
+			"alt": "A table of recent tests: daily tests were sent, two could not be sent with SMTP Error: Could not authenticate, then a manual test was sent and daily tests were sent again."
 		},
 		{
 			"id": "overview-alert",
@@ -193,7 +193,7 @@
 			"to": "#card",
 			"pad": 24,
 			"caption": "Overview: the webhook alert in a chat app, for a failure and the recovery.",
-			"alt": "A chat channel with two messages from Email Check: Email check failed on the site with SMTP Error: Could not authenticate, then Email check passed again."
+			"alt": "A chat channel with two messages from Email Check: example.com could not send its test email, with SMTP Error: Could not authenticate, then example.com can send its test email again."
 		},
 		{
 			"id": "canary-offer",
