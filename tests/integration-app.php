@@ -755,6 +755,27 @@ delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
 np_app_take();
 np_assert( 'canary-over-limit' === $np_notice(), 'turn on, no room: the notice says alerts are off (limit), not "on again"' );
 
+// A Change before the confirm, then not confirmed in 24 hours: "Turn on" with the new
+// address restarts the same canary, with the same token (a new token would make another).
+np_reset();
+np_app_take();
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'first@example.com' ) );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+$np_tok = NanoPost_Email_Check_Connection::get()['token'];
+np_app_answer( 200, array( 'check' => np_app_block( 'unconfirmed', 'second@example.com', 'pending' ) ) );
+$np_post( 'handle_alert_email', NanoPost_Email_Check_Admin::ALERT_EMAIL_ACTION, array( 'alert_email' => 'second@example.com' ) );
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'stopped', 'second@example.com', 'pending', 'not_confirmed' ) ) ) );
+np_assert( 'second@example.com' === np_xpath( np_render_screen() )->query( '//input[@id="nanopost_email_check_alert_email"]' )->item( 0 )->getAttribute( 'value' ), 'not confirmed after a Change: the field shows the new address' );
+np_app_take();
+$np_notice();
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'second@example.com' ) );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+$np_calls = np_app_take();
+np_assert( isset( $np_calls[0] ) && '/connect' === $np_calls[0]['path'] && 'Bearer ' . $np_tok === $np_calls[0]['headers']['Authorization'] && 'second@example.com' === $np_calls[0]['body']['alert_email'], 'turn on after a Change and no confirm: POST /connect with the same token and the new address', $np_calls );
+np_assert( 'canary-on' === $np_notice(), 'then: turned on (waiting for the confirm)' );
+
 // Over the limit, then stopped: POST /start when the account has room.
 update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'stopped', 'right@example.com', 'confirmed', 'over_limit' ) ) ) );
 np_app_answer( 409, array_merge( $np_409, array( 'check' => np_app_block( 'stopped', 'right@example.com', 'confirmed', 'over_limit' ) ) ) );

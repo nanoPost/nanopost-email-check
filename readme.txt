@@ -196,6 +196,9 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 
 == Changelog ==
 
+= 1.9.2 =
+* Fixed: after a change of the alert address before the confirm, and no confirm within 24 hours, "Turn on Email Canary" did nothing. It now starts the same canary again, with a new confirm email.
+
 = 1.9.1 =
 * Removed what was left of the 1.7 browser connect. nanoPost no longer serves it, and Email Canary is turned on from the plugin screen or with an account key.
 

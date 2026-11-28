@@ -175,7 +175,14 @@ class NanoPost_Email_Check_Connection {
 	 * @param string $email Address.
 	 */
 	public static function set_alert_email( $email ) {
-		self::update( array( 'alert_email' => (string) $email ) );
+		// The token now belongs to this address: "Turn on" after a missed confirm restarts
+		// the same canary with it.
+		self::update(
+			array(
+				'alert_email' => (string) $email,
+				'pending_for' => (string) $email,
+			)
+		);
 	}
 
 	/**
