@@ -26,7 +26,6 @@ class NanoPost_Email_Check_Admin {
 	const TURN_ON_ACTION     = 'nanopost_email_check_turn_on';
 	const TURN_OFF_ACTION    = 'nanopost_email_check_turn_off';
 	const ALERT_EMAIL_ACTION = 'nanopost_email_check_alert_email';
-	const RETURN_ACTION      = 'nanopost_email_check_connect_return';
 	const RESULT_ACTION      = 'nanopost_email_check_test_result';
 	const DISMISS_ENDED      = 'nanopost_email_check_dismiss_ended';
 	const STATE_ACTION       = 'nanopost_email_check_canary_state';
@@ -47,7 +46,6 @@ class NanoPost_Email_Check_Admin {
 		add_action( 'admin_post_' . self::TURN_ON_ACTION, array( __CLASS__, 'handle_turn_on' ) );
 		add_action( 'admin_post_' . self::TURN_OFF_ACTION, array( __CLASS__, 'handle_turn_off' ) );
 		add_action( 'admin_post_' . self::ALERT_EMAIL_ACTION, array( __CLASS__, 'handle_alert_email' ) );
-		add_action( 'admin_post_' . self::RETURN_ACTION, array( __CLASS__, 'handle_connect_return' ) );
 		add_action( 'admin_post_' . self::DISMISS_ENDED, array( __CLASS__, 'handle_dismiss_ended' ) );
 		add_action( 'wp_ajax_' . self::RESULT_ACTION, array( __CLASS__, 'ajax_test_result' ) );
 		add_action( 'wp_ajax_' . self::STATE_ACTION, array( __CLASS__, 'ajax_canary_state' ) );
@@ -512,15 +510,6 @@ class NanoPost_Email_Check_Admin {
 	private static function done( $outcome ) {
 		set_transient( self::notice_key(), $outcome, MINUTE_IN_SECONDS );
 		wp_safe_redirect( self::page_url() . '#nanopost-email-check-connection' );
-		exit;
-	}
-
-	/**
-	 * Sites that started the browser connect of version 1.7 come back here after an
-	 * update. That flow is gone: show the screen, where "Turn on Email Canary" is.
-	 */
-	public static function handle_connect_return() {
-		wp_safe_redirect( self::page_url() );
 		exit;
 	}
 

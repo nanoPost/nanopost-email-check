@@ -196,6 +196,9 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 
 == Changelog ==
 
+= 1.9.1 =
+* Removed what was left of the 1.7 browser connect. nanoPost no longer serves it, and Email Canary is turned on from the plugin screen or with an account key.
+
 = 1.9.0 =
 * Account key for agencies: `NANOPOST_EMAIL_CHECK_KEY` in `wp-config.php` turns Email Canary on by itself, once per site address, with alerts to the nanoPost account's address and no confirm email. The key is never stored.
 * New WP-CLI command `wp email-check connect`, with `--key` or `--email`.

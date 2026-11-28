@@ -41,7 +41,6 @@ class NanoPost_Email_Check_Connection {
 		$defaults = array(
 			'token'        => '',
 			'address'      => '',
-			'check_id'     => '',
 			'check_url'    => '',
 			'home_url'     => '',
 			'connected_at' => 0,
@@ -137,7 +136,6 @@ class NanoPost_Email_Check_Connection {
 			array(
 				'token'        => $current['token'],
 				'address'      => $address,
-				'check_id'     => '',
 				'check_url'    => isset( $answer['check_url'] ) && is_string( $answer['check_url'] ) ? esc_url_raw( $answer['check_url'], array( 'https', 'http' ) ) : '',
 				'home_url'     => home_url(),
 				'connected_at' => time(),

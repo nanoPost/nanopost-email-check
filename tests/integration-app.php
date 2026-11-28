@@ -52,7 +52,6 @@ function np_app_connect( $extra = array() ) {
 			array(
 				'token'        => 'tok-123',
 				'address'      => 'canary+k7f3q9x2@nanopost.example',
-				'check_id'     => '01JD',
 				'check_url'    => 'https://app.example/checks/01JD',
 				'home_url'     => home_url(),
 				'connected_at' => time(),
@@ -784,8 +783,6 @@ update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_E
 NanoPost_Email_Check_Scheduler::deactivate( false );
 np_assert( array() === np_app_take(), 'deactivate while not confirmed: no call (the 24 hours run on)' );
 NanoPost_Email_Check_Scheduler::ensure_scheduled();
-// The old browser connect return just shows the screen.
-np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) ), 'redirect:' . NanoPost_Email_Check_Admin::page_url() ) && array() === np_app_take(), 'the 1.7 return URL: back to the screen, no call' );
 
 np_reset();
 np_app_connect();
