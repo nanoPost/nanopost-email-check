@@ -180,6 +180,85 @@ class NanoPost_Email_Check_CLI {
 	}
 
 	/**
+	 * Turn Email Canary on, with an account key or an alert address.
+	 *
+	 * With a key, Email Canary watches at once, with alerts to the address of the nanoPost
+	 * account. With an address, a confirm email goes there, and alerts are off until it is
+	 * confirmed. Either way, one test email goes out at once. The key is sent in this call
+	 * only, and never stored.
+	 *
+	 * Exits with 0 when Email Canary is on (or waits for the confirm), and 1 when it is not,
+	 * or when its alerts are off because the nanoPost account has no room for this site.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--key=<key>]
+	 * : An account key from nanoPost (Settings > Profile > Account key). With no --key and no --email,
+	 * the key in the NANOPOST_EMAIL_CHECK_KEY constant is used.
+	 *
+	 * [--email=<email>]
+	 * : An alert address, in place of a key.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     $ wp email-check connect --key=npk_...
+	 *     Success: Email Canary is on. Alerts go to owner@example.com.
+	 *
+	 *     $ wp email-check connect --email=owner@example.com
+	 *     Success: Email Canary is on. We sent a confirm email to owner@example.com. Alerts are off until it is confirmed.
+	 *
+	 * @param array $args       Positional arguments (none).
+	 * @param array $assoc_args Options.
+	 */
+	public function connect( $args, $assoc_args ) {
+		$email = isset( $assoc_args['email'] ) ? sanitize_email( (string) $assoc_args['email'] ) : '';
+		$key   = isset( $assoc_args['key'] ) ? trim( (string) $assoc_args['key'] ) : '';
+		if ( isset( $assoc_args['email'] ) && isset( $assoc_args['key'] ) ) {
+			WP_CLI::error( __( 'Use --key or --email, not both.', 'nanopost-email-check' ) );
+		}
+		if ( isset( $assoc_args['email'] ) && ! is_email( $email ) ) {
+			WP_CLI::error( __( 'The --email value is not a valid email address.', 'nanopost-email-check' ) );
+		}
+		if ( '' === $email && '' === $key ) {
+			$key = NanoPost_Email_Check_Key::constant_key();
+			if ( '' === $key ) {
+				WP_CLI::error( __( 'Give --key or --email, or set NANOPOST_EMAIL_CHECK_KEY in wp-config.php.', 'nanopost-email-check' ) );
+			}
+		}
+		if ( NanoPost_Email_Check_Connection::is_connected() ) {
+			WP_CLI::error( __( 'Email Canary is already set up for this site. Turn it off on the plugin screen first.', 'nanopost-email-check' ) );
+		}
+
+		$call = '' !== $key ? NanoPost_Email_Check_Key::connect( $key ) : NanoPost_Email_Check_App::connect( $email );
+		if ( ! $call['ok'] ) {
+			if ( in_array( $call['error'], array( NanoPost_Email_Check_Key::ERROR_INVALID, NanoPost_Email_Check_Key::ERROR_EXISTS ), true ) ) {
+				WP_CLI::error( NanoPost_Email_Check_Key::error_text( $call['error'] ) );
+			}
+			$detail = '' !== $call['message'] ? $call['message'] : ( 0 === $call['code'] ? $call['error'] : 'HTTP ' . $call['code'] );
+			/* translators: %s: error text or HTTP status. */
+			WP_CLI::error( sprintf( __( 'Email Canary did not turn on: %s', 'nanopost-email-check' ), $detail ) );
+		}
+
+		$block   = NanoPost_Email_Check_Canary::block();
+		$results = NanoPost_Email_Check_Plugin::run_checks( NanoPost_Email_Check_Result::TRIGGER_CLI );
+		if ( ! empty( $results ) && '' !== $results[0]->test_id ) {
+			/* translators: %s: test ID. */
+			WP_CLI::log( sprintf( __( 'A test email went out (test %s).', 'nanopost-email-check' ), $results[0]->test_id ) );
+		}
+		$address = NanoPost_Email_Check_Admin::alert_address( $block );
+		if ( null !== $block && 'over_limit' === $block['watching'] ) {
+			WP_CLI::error( __( 'Email Canary: alerts are OFF. Your nanoPost account has reached its limit of sites. Remove one in nanoPost, or ask us for more.', 'nanopost-email-check' ) );
+		}
+		if ( null !== $block && 'unconfirmed' === $block['watching'] ) {
+			/* translators: %s: email address. */
+			WP_CLI::success( sprintf( __( 'Email Canary is on. We sent a confirm email to %s. Alerts are off until it is confirmed.', 'nanopost-email-check' ), $address ) );
+			return;
+		}
+		/* translators: %s: email address. */
+		WP_CLI::success( sprintf( __( 'Email Canary is on. Alerts go to %s.', 'nanopost-email-check' ), $address ) );
+	}
+
+	/**
 	 * Post a test alert to the saved webhook URL.
 	 *
 	 * Works like "Send test alert" on the plugin screen, without the once-a-minute limit.

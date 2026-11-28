@@ -120,6 +120,10 @@ Yes, with WP-CLI. The `wp email-check` command has these subcommands:
 
 `run` and `test-alert` have no once-a-minute limit. On multisite, choose the site with `--url`. For details, run `wp help email-check`, or read [settings in code and WP-CLI](https://nanopo.st/email-check-plugin/code-and-cli/).
 
+= Can I turn on Email Canary on many sites at once? =
+
+Yes, with an account key. Make one in nanoPost (Settings > Profile > Account key), then add `define( 'NANOPOST_EMAIL_CHECK_KEY', '...' );` to `wp-config.php`, or run `wp email-check connect --key=...` on each site. Email Canary then turns on by itself, with alerts to your nanoPost account's address and no confirm email. The key only adds sites; it cannot read your account. It turns a site on once: not again after you turn it off, and not on a copy of the site at another address or on a site address that is not public. On a multisite network, the constant turns on only the main site; use WP-CLI with `--url` for the other sites.
+
 = Does it work on multisite? =
 
 Yes. Each site runs its own checks, with its own settings, log and notices. Network activation schedules the checks on every site, and on each new site. On a network of more than 10,000 sites, each site is scheduled on its next request instead. On a network where all sites use the same mail setup, activating the plugin on the main site is enough: network activation then sends one test email per site, which repeats the same check.
@@ -144,11 +148,12 @@ The plugin makes no outside requests unless you set a webhook URL or turn on Ema
 
 = nanoPost Email Canary (optional, after you turn it on) =
 
-nanoPost Email Canary (app.nanopo.st) is a service run by the plugin's authors. It checks that each test email arrives, and emails you when one does not. The plugin calls it only after you type an alert address and click "Turn on Email Canary" on the plugin screen. Until then, nothing is sent. When you turn it off, deactivate the plugin or delete it, the plugin tells Email Canary.
+nanoPost Email Canary (app.nanopo.st) is a service run by the plugin's authors. It checks that each test email arrives, and emails you when one does not. The plugin calls it only after you type an alert address and click "Turn on Email Canary" on the plugin screen, or after you set a nanoPost account key in `wp-config.php` or run `wp email-check connect`. Until then, nothing is sent. When you turn it off, deactivate the plugin or delete it, the plugin tells Email Canary.
 
 While Email Canary is on, the site sends:
 
 * when you turn it on: the site address, the alert address you typed, the site's time zone, the test interval, the webhook URL if you set one, the versions of the plugin, WordPress and PHP, and a random key that the plugin makes for this site;
+* if you set a nanoPost account key (in `wp-config.php` or with WP-CLI) in place of an alert address: that key, once, in the call that turns Email Canary on. The plugin does not store it;
 * the same site settings again when one of them changes;
 * for each test: a test ID, the time it was sent, what started it (the schedule, a user or WP-CLI), whether WordPress accepted the email, and its error text if it did not (at most 500 characters; it can contain host names or email addresses);
 * a request for the result of each test, after it is due, and for the state of the site when you open the plugin screen;
@@ -190,6 +195,10 @@ The plugin screen and notices link to help pages on nanopo.st. These are plain l
 4. An alert in a chat app when the site could not send its test email, sent through the optional webhook.
 
 == Changelog ==
+
+= 1.9.0 =
+* Account key for agencies: `NANOPOST_EMAIL_CHECK_KEY` in `wp-config.php` turns Email Canary on by itself, once per site address, with alerts to the nanoPost account's address and no confirm email. The key is never stored.
+* New WP-CLI command `wp email-check connect`, with `--key` or `--email`.
 
 = 1.8.0 =
 * Email Canary replaces "Connect to nanoPost": type an alert address and turn it on from the plugin screen. No sign-up in the browser. A test email goes out at once, with its proof of arrival.
