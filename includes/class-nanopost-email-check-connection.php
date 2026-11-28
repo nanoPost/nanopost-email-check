@@ -50,6 +50,7 @@ class NanoPost_Email_Check_Connection {
 			'retry_until'  => 0,
 			'site_hash'    => '',
 			'alert_email'  => '',
+			'pending_for'  => '',
 			'pending_at'   => 0,
 		);
 
@@ -64,26 +65,34 @@ class NanoPost_Email_Check_Connection {
 	/**
 	 * Start "Turn on Email Canary": the token the plugin makes for the connect call. It is
 	 * stored before the call, so a retry sends the same token and the app does not make a
-	 * second canary. A pending token for the same address is used again; another address
-	 * gets a new token. Two requests at the same time get the same token (add_option()).
+	 * second canary. A pending token for the same address (or the same key) is used again;
+	 * another one gets a new token. Two requests at the same time get the same token
+	 * (add_option()).
 	 *
-	 * @param string $email Alert address.
+	 * @param string $identity The alert address, or "key:" and the key's fingerprint.
+	 * @param string $email    The alert address to keep, or '' for a key.
 	 * @return string The token, or '' while a connection with an address exists (except
 	 *                for a canary that was not confirmed, which connects again).
 	 */
-	public static function begin( $email ) {
+	public static function begin( $identity, $email = null ) {
+		$email   = null === $email ? (string) $identity : (string) $email;
 		$current = self::get();
+		// A connection stored by 1.8.0 has no pending_for: its alert address stands in.
+		if ( '' === $current['pending_for'] ) {
+			$current['pending_for'] = $current['alert_email'];
+		}
 		if ( '' !== $current['address'] && '' !== $current['token'] ) {
 			// A canary that was not confirmed in 24 hours: connect again with its token.
 			$block = NanoPost_Email_Check_Canary::block();
-			return null !== $block && 'not_confirmed' === $block['stopped_reason'] && $email === $current['alert_email'] ? $current['token'] : '';
+			return null !== $block && 'not_confirmed' === $block['stopped_reason'] && $identity === $current['pending_for'] ? $current['token'] : '';
 		}
-		if ( '' !== $current['token'] && $email === $current['alert_email'] ) {
+		if ( '' !== $current['token'] && $identity === $current['pending_for'] ) {
 			return $current['token'];
 		}
 		$pending = array(
 			'token'       => self::new_token(),
-			'alert_email' => (string) $email,
+			'alert_email' => $email,
+			'pending_for' => (string) $identity,
 			'pending_at'  => time(),
 			'home_url'    => home_url(),
 		);
@@ -91,7 +100,7 @@ class NanoPost_Email_Check_Connection {
 			// Another request stored a token a moment ago: use it when it is for this address.
 			wp_cache_delete( self::OPTION, 'options' );
 			$current = self::get();
-			if ( $email === $current['alert_email'] && '' !== $current['token'] ) {
+			if ( $identity === $current['pending_for'] && '' !== $current['token'] ) {
 				return $current['token'];
 			}
 		}
@@ -133,6 +142,7 @@ class NanoPost_Email_Check_Connection {
 				'home_url'     => home_url(),
 				'connected_at' => time(),
 				'alert_email'  => $current['alert_email'],
+				'pending_for'  => $current['pending_for'],
 				'site_hash'    => (string) $site_hash,
 			),
 			false

@@ -106,6 +106,7 @@ class NanoPost_Email_Check_Scheduler {
 			wp_clear_scheduled_hook( self::HOOK );
 			wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 			wp_clear_scheduled_hook( NanoPost_Email_Check_App::START_HOOK );
+			wp_clear_scheduled_hook( NanoPost_Email_Check_Key::HOOK );
 			wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 			return;
 		}
@@ -116,6 +117,7 @@ class NanoPost_Email_Check_Scheduler {
 			wp_clear_scheduled_hook( self::HOOK );
 			wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
 			wp_clear_scheduled_hook( NanoPost_Email_Check_App::START_HOOK );
+			wp_clear_scheduled_hook( NanoPost_Email_Check_Key::HOOK );
 			wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 			restore_current_blog();
 		}

@@ -114,6 +114,7 @@ class NanoPost_Email_Check_Help {
 	const CANARY_CHANGE  = 'change-the-alert-address';
 	const CANARY_STOP    = 'stop-watching';
 	const CANARY_SENT    = 'what-is-sent-to-nanopost';
+	const CANARY_KEY     = 'turn-on-with-an-account-key';
 
 	/**
 	 * A part of the Email Canary help page.
