@@ -161,7 +161,7 @@ While Email Canary is on, the site sends:
 * when you turn it off or on, deactivate or activate the plugin: which of these happened;
 * the plugin version in every call.
 
-The test emails go to Email Canary's address for the site instead of the recipient you set. Email Canary receives each test email and its headers, as for any email. nanoPost keeps the IP address of each call for 30 days. The plugin sends no user names or other user data, no other email, and no other settings. The alert address is sent only as you typed it.
+The test emails go to Email Canary's address for the site instead of the recipient you set. The Email Canary service receives each test email and its headers, as for any email. nanoPost keeps the IP address of each call for 30 days. The plugin sends no user names or other user data, no other email, and no other settings. The alert address is sent only as you typed it.
 
 * Terms of use: https://nanopo.st/terms/#the-app-appnanopost
 * Privacy policy: https://nanopo.st/privacy/#the-app-appnanopost
