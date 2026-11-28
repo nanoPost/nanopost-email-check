@@ -110,7 +110,8 @@ class NanoPost_Email_Check_Alerts {
 	/**
 	 * Active alerts, keyed by a string that changes with each new problem.
 	 *
-	 * @return array Key => type ("failed" or "stale").
+	 * @return array Key => type ("failed", "stale", or a problem of Email Canary:
+	 *               "canary-missing", "canary-auth").
 	 */
 	public static function active() {
 		$alerts = array();
@@ -125,7 +126,69 @@ class NanoPost_Email_Check_Alerts {
 			$alerts[ 'stale:' . $stale ] = 'stale';
 		}
 
+		foreach ( self::canary_problems() as $problem ) {
+			$alerts[ $problem['key'] ] = 'canary-' . $problem['type'];
+		}
+
+		$unconfirmed = self::unconfirmed();
+		if ( null !== $unconfirmed ) {
+			$alerts[ 'canary-unconfirmed:' . $unconfirmed['confirm_by'] ] = 'canary-unconfirmed';
+		}
+
+		foreach ( self::failing() as $email ) {
+			$alerts[ 'canary-failing:' . $email ] = 'canary-failing';
+		}
+
 		return $alerts;
+	}
+
+	/**
+	 * The block while alerts are off until the owner confirms the alert address, or null.
+	 *
+	 * @return array|null
+	 */
+	private static function unconfirmed() {
+		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
+			return null;
+		}
+		$block = NanoPost_Email_Check_Canary::block();
+		return null !== $block && 'unconfirmed' === $block['watching'] ? $block : null;
+	}
+
+	/**
+	 * Alert addresses that Email Canary's alerts do not reach (they bounce). The email
+	 * cannot tell the owner, so wp-admin does.
+	 *
+	 * @return string[]
+	 */
+	private static function failing() {
+		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
+			return array();
+		}
+		$block = NanoPost_Email_Check_Canary::block();
+		if ( null === $block ) {
+			return array();
+		}
+		$failing = array();
+		foreach ( $block['alerts_to'] as $entry ) {
+			if ( 'failing' === $entry['state'] ) {
+				$failing[] = $entry['email'];
+			}
+		}
+		return $failing;
+	}
+
+	/**
+	 * Problems that Email Canary emails about, from the stored state. None when the site is
+	 * not connected.
+	 *
+	 * @return array[]
+	 */
+	private static function canary_problems() {
+		if ( ! NanoPost_Email_Check_Connection::is_connected() ) {
+			return array();
+		}
+		return NanoPost_Email_Check_Canary::problems( NanoPost_Email_Check_Canary::block() );
 	}
 
 	/**
@@ -151,8 +214,14 @@ class NanoPost_Email_Check_Alerts {
 
 			if ( 'failed' === $type ) {
 				self::render_failed( $key );
-			} else {
+			} elseif ( 'stale' === $type ) {
 				self::render_stale( $key );
+			} elseif ( 'canary-unconfirmed' === $type ) {
+				self::render_unconfirmed( $key );
+			} elseif ( 'canary-failing' === $type ) {
+				self::render_failing( $key );
+			} else {
+				self::render_canary( $key );
 			}
 		}
 	}
@@ -166,13 +235,13 @@ class NanoPost_Email_Check_Alerts {
 		$result = self::failed_result();
 
 		echo '<div id="nanopost-email-check-notice-failed" class="notice notice-error"><p>';
-		echo '<strong>' . esc_html__( 'Email check failed.', 'nanopost-email-check' ) . '</strong> ';
+		echo '<strong>' . esc_html__( 'Email Check: this site could not send its test email.', 'nanopost-email-check' ) . '</strong> ';
 		echo esc_html(
 			sprintf(
 				/* translators: 1: date and time, 2: email address. */
 				__( 'On %1$s, WordPress could not send the test email to %2$s. Your site may not be able to send email.', 'nanopost-email-check' ),
 				NanoPost_Email_Check_Admin::format_date( $result->time ),
-				$result->recipient
+				NanoPost_Email_Check_Admin::recipient_label( $result )
 			)
 		);
 		echo '</p><p>' . esc_html__( 'Error:', 'nanopost-email-check' ) . ' <code>' . esc_html( $result->error_message() ) . '</code></p>';
@@ -187,17 +256,72 @@ class NanoPost_Email_Check_Alerts {
 	}
 
 	/**
+	 * Notice for a problem that Email Canary found, with the same core sentence as its
+	 * email.
+	 *
+	 * @param string $key Alert key.
+	 */
+	private static function render_canary( $key ) {
+		foreach ( self::canary_problems() as $problem ) {
+			if ( $key !== $problem['key'] ) {
+				continue;
+			}
+			echo '<div class="notice notice-error nanopost-email-check-notice-canary"><p>';
+			echo '<strong>' . esc_html( NanoPost_Email_Check_Canary::problem_text( $problem ) ) . '</strong>';
+			$reason = 'missing' === $problem['type'] ? NanoPost_Email_Check_Canary::reason_text( $problem['reason'] ) : __( 'Real emails from this site can be refused.', 'nanopost-email-check' );
+			if ( '' !== $reason ) {
+				echo ' ' . esc_html( $reason );
+			}
+			echo '</p>';
+			self::render_links( $key, '' === $problem['help_url'] ? array() : array( $problem['help_url'] => __( 'What to do', 'nanopost-email-check' ) ) );
+			echo '</div>';
+		}
+	}
+
+	/**
+	 * Notice for an alert address that Email Canary's alerts do not reach.
+	 *
+	 * @param string $key Alert key.
+	 */
+	private static function render_failing( $key ) {
+		$email = substr( $key, strlen( 'canary-failing:' ) );
+		echo '<div class="notice notice-error nanopost-email-check-notice-failing"><p><strong>';
+		/* translators: %s: email address. */
+		echo esc_html( sprintf( __( 'Email Canary: alerts do not reach %s.', 'nanopost-email-check' ), $email ) ) . '</strong> ';
+		echo esc_html__( 'Change the alert address on the plugin screen.', 'nanopost-email-check' );
+		echo '</p>';
+		self::render_links( $key, array( NanoPost_Email_Check_Help::canary( NanoPost_Email_Check_Help::CANARY_CHANGE, NanoPost_Email_Check_Help::PLACE_NOTICE_CANARY ) => __( 'How to change it', 'nanopost-email-check' ) ) );
+		echo '</div>';
+	}
+
+	/**
+	 * Notice that stays until the confirm: alerts are off.
+	 *
+	 * @param string $key Alert key.
+	 */
+	private static function render_unconfirmed( $key ) {
+		$block = self::unconfirmed();
+		echo '<div class="notice notice-warning nanopost-email-check-notice-unconfirmed"><p><strong>';
+		echo esc_html__( 'Email Canary: alerts are OFF until you confirm.', 'nanopost-email-check' ) . '</strong> ';
+		/* translators: %s: email address. */
+		echo esc_html( sprintf( __( 'We sent an email to %s.', 'nanopost-email-check' ), NanoPost_Email_Check_Admin::alert_address( $block ) ) );
+		echo '</p>';
+		self::render_links( $key, array( NanoPost_Email_Check_Help::canary( NanoPost_Email_Check_Help::CANARY_CONFIRM, NanoPost_Email_Check_Help::PLACE_NOTICE_CANARY ) => __( 'Why confirm', 'nanopost-email-check' ) ) );
+		echo '</div>';
+	}
+
+	/**
 	 * Notice for stopped scheduled checks.
 	 *
 	 * @param string $key Alert key.
 	 */
 	private static function render_stale( $key ) {
 		echo '<div id="nanopost-email-check-notice-stale" class="notice notice-warning"><p>';
-		echo '<strong>' . esc_html__( 'Email checks have stopped.', 'nanopost-email-check' ) . '</strong> ';
+		echo '<strong>' . esc_html__( 'Email Check: scheduled tests have stopped.', 'nanopost-email-check' ) . '</strong> ';
 		echo esc_html(
 			sprintf(
 				/* translators: %s: date and time. */
-				__( 'No scheduled email check has finished since %s. WP-Cron may not be running on this site, or the check may be stopping with a PHP error.', 'nanopost-email-check' ),
+				__( 'No scheduled test has finished since %s. WP-Cron may not be running on this site, or the test may be stopping with a PHP error.', 'nanopost-email-check' ),
 				NanoPost_Email_Check_Admin::format_date( (int) self::stale_since() )
 			)
 		);

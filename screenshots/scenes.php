@@ -6,7 +6,8 @@
  *   wp eval-file wp-content/plugins/nanopost-email-check/screenshots/scenes.php <scene>
  *
  * Scenes: main, failed, stale, connected (a fake nanoPost connection and a proof of
- * arrival box), reset, alert (prints the webhook text as JSON). Times are relative to now, so "x ago" texts stay the
+ * arrival box), canary <state> (after main: a fake Email Canary state; states: unconfirmed,
+ * on, problem, off), reset, alert (prints the webhook text as JSON). Times are relative to now, so "x ago" texts stay the
  * same between runs on one day.
  *
  * @package NanoPost_Email_Check
@@ -24,7 +25,9 @@ $scene = isset( $args[0] ) ? $args[0] : 'main';
 delete_option( NanoPost_Email_Check_Connection::OPTION );
 delete_option( NanoPost_Email_Check_Connection::NOTICE_OPTION );
 delete_option( NanoPost_Email_Check_App::LOG_OPTION );
+delete_option( NanoPost_Email_Check_Canary::OPTION );
 wp_clear_scheduled_hook( NanoPost_Email_Check_App::SYNC_HOOK );
+wp_unschedule_hook( NanoPost_Email_Check_Canary::FETCH_HOOK );
 
 if ( 'reset' === $scene ) {
 	delete_option( NanoPost_Email_Check_Log::OPTION );
@@ -147,6 +150,136 @@ update_option(
 );
 
 WP_CLI::success( "Scene $scene ready." );
+
+if ( 'canary' === $scene ) {
+	// A fake Email Canary state on top of the main scene: the addresses and links are made
+	// up. The screen's state lock is set, so the page makes no call to nanoPost.
+	$state = isset( $args[1] ) ? $args[1] : 'on';
+	if ( 'offer' === $state ) {
+		// Not on yet: only the address typed last, which the offer shows in its field.
+		update_option( NanoPost_Email_Check_Connection::OPTION, array( 'alert_email' => 'you@example.com' ), false );
+		WP_CLI::success( 'Scene canary offer.' );
+		return;
+	}
+	$iso = static function ( $time ) {
+		return gmdate( 'Y-m-d\TH:i:s\Z', $time );
+	};
+	update_option(
+		NanoPost_Email_Check_Connection::OPTION,
+		array(
+			'token'        => 'demo-token',
+			'address'      => 'canary+demo4k7f3q9x2@nanopost.app',
+			'check_url'    => 'https://app.nanopo.st/canaries/01jd0000000000000000demo01',
+			'home_url'     => home_url(),
+			'connected_at' => time() - 10 * $day,
+			'alert_email'  => 'you@example.com',
+			'site_hash'    => md5( (string) wp_json_encode( NanoPost_Email_Check_App::site_body() ) ),
+		),
+		false
+	);
+	set_transient( NanoPost_Email_Check_Canary::SCREEN_LOCK, 1, HOUR_IN_SECONDS );
+
+	// The last four tests went to Email Canary, with what it said about each.
+	$log  = get_option( NanoPost_Email_Check_Log::OPTION, array() );
+	$says = array(
+		array( 'arrived', 'pass', 'none', 'pass' ),
+		array( 'arrived', 'pass', 'none', 'pass' ),
+		array( 'arrived', 'pass', 'pass', 'pass' ),
+		array( 'arrived', 'pass', 'pass', 'pass' ),
+	);
+	if ( 'problem' === $state ) {
+		$says[0] = array( 'missing', '', '', '' );
+	}
+	foreach ( $says as $i => $say ) {
+		if ( ! isset( $log[ $i ] ) || empty( $log[ $i ]['passed'] ) ) {
+			continue;
+		}
+		$log[ $i ]['test_id']   = 'demo' . str_pad( (string) $i, 8, '0', STR_PAD_LEFT );
+		$log[ $i ]['recipient'] = 'canary+demo4k7f3q9x2.' . $log[ $i ]['test_id'] . '@nanopost.app';
+		$log[ $i ]['announce']  = 'ok';
+		$log[ $i ]['canary']    = array(
+			'arrival'    => $say[0],
+			'arrived_at' => 'arrived' === $say[0] ? (int) $log[ $i ]['time'] + 4 : 0,
+			'spf'        => $say[1],
+			'dkim'       => $say[2],
+			'dmarc'      => $say[3],
+			'reason'     => '',
+			'help_url'   => '',
+		);
+	}
+	update_option( NanoPost_Email_Check_Log::OPTION, $log, false );
+
+	$first   = $log[0];
+	$arrival = array(
+		'received_at' => $iso( (int) $log[ 'problem' === $state ? 1 : 0 ]['time'] + 4 ),
+		'test_id'     => $log[ 'problem' === $state ? 1 : 0 ]['test_id'],
+		'spf'         => 'pass',
+		'dkim'        => 'none',
+		'dmarc'       => 'pass',
+	);
+	$block   = array(
+		'observed_at'      => $iso( time() - 60 ),
+		'watching'         => 'on',
+		'arrival'          => 'arrived',
+		'next_expected_by' => $iso( (int) $first['time'] + $day + 6 * $hour ),
+		'sending'          => 'ok',
+		'receive_path'     => 'ok',
+		'last_arrival'     => $arrival,
+		'last_test'        => array(
+			'test_id'    => $first['test_id'],
+			'sent_at'    => $iso( (int) $first['time'] ),
+			'arrival'    => 'problem' === $state ? 'missing' : 'arrived',
+			'arrived_at' => 'problem' === $state ? null : $iso( (int) $first['time'] + 4 ),
+			'spf'        => 'pass',
+			'dkim'       => 'none',
+			'dmarc'      => 'pass',
+		),
+		'alerts_to'        => array(
+			array(
+				'email' => 'you@example.com',
+				'state' => 'confirmed',
+			),
+		),
+		'check_url'        => 'https://app.nanopo.st/canaries/01jd0000000000000000demo01',
+	);
+	if ( 'change' === $state ) {
+		$block['alerts_to'][]  = array(
+			'email' => 'new@example.com',
+			'state' => 'pending',
+		);
+		$block['confirm_mail'] = array(
+			'state'           => 'sent',
+			'next_allowed_at' => $iso( time() + 23 * $hour ),
+		);
+	} elseif ( 'failing' === $state ) {
+		$block['alerts_to'][0]['state'] = 'failing';
+	}
+	if ( 'unconfirmed' === $state ) {
+		$block['watching']              = 'unconfirmed';
+		$block['confirm_by']            = $iso( time() + 23 * $hour );
+		$block['confirm_mail']          = array(
+			'state'           => 'sent',
+			'next_allowed_at' => $iso( time() + 23 * $hour ),
+		);
+		$block['next_expected_by']      = null;
+		$block['alerts_to'][0]['state'] = 'pending';
+	} elseif ( 'problem' === $state ) {
+		$block['arrival']          = 'missing';
+		$block['next_expected_by'] = null;
+	} elseif ( 'off' === $state ) {
+		$block['watching']         = 'stopped';
+		$block['stopped_reason']   = 'owner';
+		$block['next_expected_by'] = null;
+	}
+	update_option(
+		NanoPost_Email_Check_Canary::OPTION,
+		array(
+			'block'  => NanoPost_Email_Check_Canary::normalize( $block ),
+			'got_at' => time() - 60,
+		)
+	);
+	WP_CLI::success( "Scene canary $state." );
+}
 
 if ( 'connected' === $scene ) {
 	// A fake connection: the address and check link are made up. The site settings hash

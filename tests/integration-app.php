@@ -41,7 +41,7 @@ function np_app_take() {
 }
 
 /**
- * Store a connection as the exchange would.
+ * Store a connection as "Turn on Email Canary" would.
  *
  * @param array $extra Values to change.
  */
@@ -60,6 +60,33 @@ function np_app_connect( $extra = array() ) {
 			$extra
 		),
 		false
+	);
+}
+
+/**
+ * A check block for the fake app's answers.
+ *
+ * @param string      $watching on, unconfirmed, stopped, over_limit.
+ * @param string      $email    Alert address.
+ * @param string      $state    confirmed or pending.
+ * @param string|null $reason   stopped_reason.
+ * @return array
+ */
+function np_app_block( $watching, $email, $state, $reason = null ) {
+	return array(
+		'observed_at'    => gmdate( 'Y-m-d\TH:i:s\Z' ),
+		'watching'       => $watching,
+		'stopped_reason' => $reason,
+		'arrival'        => 'waiting',
+		'sending'        => 'ok',
+		'receive_path'   => 'ok',
+		'alerts_to'      => array(
+			array(
+				'email' => $email,
+				'state' => $state,
+			),
+		),
+		'check_url'      => 'https://app.example/checks/01JE',
 	);
 }
 
@@ -82,15 +109,31 @@ add_filter(
 
 		if ( $GLOBALS['np_app_next'] ) {
 			list( $code, $body, $headers ) = array_shift( $GLOBALS['np_app_next'] );
-		} elseif ( '/connect/exchange' === $path ) {
+		} elseif ( '/connect' === $path ) {
 			list( $code, $body, $headers ) = array(
-				200,
+				201,
 				array(
-					'token'     => 'tok-new',
-					'check_id'  => '01JE',
 					'address'   => 'canary+abcd1234@nanopost.example',
-					'interval'  => 'daily',
 					'check_url' => 'https://app.example/checks/01JE',
+					'check'     => array(
+						'observed_at'  => gmdate( 'Y-m-d\TH:i:s\Z' ),
+						'watching'     => 'unconfirmed',
+						'confirm_by'   => gmdate( 'Y-m-d\TH:i:s\Z', time() + DAY_IN_SECONDS ),
+						'confirm_mail' => array(
+							'state'           => 'sent',
+							'next_allowed_at' => gmdate( 'Y-m-d\TH:i:s\Z', time() + DAY_IN_SECONDS ),
+						),
+						'arrival'      => 'waiting',
+						'sending'      => 'ok',
+						'receive_path' => 'ok',
+						'alerts_to'    => array(
+							array(
+								'email' => isset( $args['body'] ) ? (string) ( json_decode( $args['body'], true )['alert_email'] ?? '' ) : '',
+								'state' => 'pending',
+							),
+						),
+						'check_url'    => 'https://app.example/checks/01JE',
+					),
 				),
 				array(),
 			);
@@ -134,7 +177,6 @@ np_reset();
 np_app_take();
 // The dev site may point at the staging app with NANOPOST_EMAIL_CHECK_APP_URL.
 $np_app_base = defined( 'NANOPOST_EMAIL_CHECK_APP_URL' ) ? untrailingslashit( NANOPOST_EMAIL_CHECK_APP_URL ) : 'https://app.nanopo.st/api/v1';
-$np_app_page = preg_replace( '#/api/v1$#', '', $np_app_base ) . '/connect?';
 np_assert( NanoPost_Email_Check_App::base_url() === $np_app_base, 'base URL: the production API, or the constant', NanoPost_Email_Check_App::base_url() );
 np_assert( ! NanoPost_Email_Check_Connection::is_connected() && ! NanoPost_Email_Check_Connection::calls_allowed(), 'no connection, no calls' );
 $np = NanoPost_Email_Check_App::announce( 'abcdefabcdef', time(), 'manual', true, '' );
@@ -145,65 +187,79 @@ $np_results = NanoPost_Email_Check_Plugin::run_checks( 'manual' );
 np_assert( '' === $np_results[0]->test_id && '' === $np_results[0]->announce && array() === np_app_take(), 'a test without a connection: no test ID, no call' );
 remove_filter( 'pre_wp_mail', '__return_true' );
 
-$np_url = NanoPost_Email_Check_App::connect_url( 'https://example.org/wp-admin/admin-post.php?action=x', 'st&te' );
-np_assert( 0 === strpos( $np_url, $np_app_page ), 'connect page: the API base without /api/v1', $np_url );
-parse_str( (string) wp_parse_url( $np_url, PHP_URL_QUERY ), $np_q );
-np_assert( home_url() === $np_q['site'] && 'https://example.org/wp-admin/admin-post.php?action=x' === $np_q['return'] && 'st&te' === $np_q['state'], 'connect page: site, return and state survive the URL', $np_q );
 
 // ---------------------------------------------------------------------------------------
-np_section( 'App: exchange the code' );
+np_section( 'App: turn on Email Canary (POST /connect)' );
 np_reset();
 np_app_take();
 update_option( NanoPost_Email_Check_Webhook::STATE_OPTION, array( 'last_status' => array( 'wp_mail' => 'fail' ) ) );
-$np       = NanoPost_Email_Check_App::exchange( 'code-1' );
+$np       = NanoPost_Email_Check_App::connect( 'owner@example.com' );
 $np_calls = np_app_take();
-np_assert( $np['ok'] && 1 === count( $np_calls ), 'exchange: one call, ok', $np );
-$np_call = $np_calls[0];
-np_assert( 'POST' === $np_call['method'] && '/connect/exchange' === $np_call['path'] && 10 === $np_call['timeout'], 'exchange: POST /connect/exchange, 10 seconds', $np_call );
-np_assert( ! isset( $np_call['headers']['Authorization'] ), 'exchange: no Authorization header' );
-np_assert( NANOPOST_EMAIL_CHECK_VERSION === $np_call['headers']['X-Plugin-Version'] && 'application/json' === $np_call['headers']['Accept'], 'exchange: version and Accept headers', $np_call['headers'] );
-np_assert( 'nanoPost-Email-Check/' . NANOPOST_EMAIL_CHECK_VERSION === $np_call['ua'], 'exchange: User-Agent names only the plugin and its version', $np_call['ua'] );
-np_assert(
-	array(
-		'code'     => 'code-1',
-		'site_url' => home_url(),
-	) === $np_call['body'],
-	'exchange: body has the code and the site URL only',
-	$np_call['body']
-);
+np_assert( $np['ok'] && 1 === count( $np_calls ), 'connect: one call, ok', $np );
+$np_call  = $np_calls[0];
+$np_token = substr( $np_call['headers']['Authorization'], 7 );
+np_assert( 'POST' === $np_call['method'] && '/connect' === $np_call['path'] && 10 === $np_call['timeout'], 'connect: POST /connect, 10 seconds', $np_call );
+np_assert( 1 === preg_match( '/^[A-Za-z0-9_-]{43}$/', $np_token ), 'connect: a token the plugin made, 32 random bytes in base64url, as Bearer', $np_token );
+np_assert( NANOPOST_EMAIL_CHECK_VERSION === $np_call['headers']['X-Plugin-Version'] && 'application/json' === $np_call['headers']['Accept'], 'connect: version and Accept headers', $np_call['headers'] );
+np_assert( 'nanoPost-Email-Check/' . NANOPOST_EMAIL_CHECK_VERSION === $np_call['ua'], 'connect: User-Agent names only the plugin and its version', $np_call['ua'] );
+np_assert( array( 'site_url', 'plugin_version', 'wp_version', 'php_version', 'interval', 'webhook_url', 'timezone', 'alert_email' ) === array_keys( $np_call['body'] ), 'connect: exactly the contract fields', $np_call['body'] );
+np_assert( 'owner@example.com' === $np_call['body']['alert_email'] && home_url() === $np_call['body']['site_url'] && wp_timezone_string() === $np_call['body']['timezone'], 'connect: the alert address, the site and the time zone', $np_call['body'] );
 $np_conn = NanoPost_Email_Check_Connection::get();
-np_assert( NanoPost_Email_Check_Connection::is_connected() && 'tok-new' === $np_conn['token'] && 'canary+abcd1234@nanopost.example' === $np_conn['address'] && home_url() === $np_conn['home_url'], 'exchange: the connection is stored', $np_conn );
+np_assert( NanoPost_Email_Check_Connection::is_connected() && $np_token === $np_conn['token'] && 'canary+abcd1234@nanopost.example' === $np_conn['address'] && home_url() === $np_conn['home_url'] && 'owner@example.com' === $np_conn['alert_email'], 'connect: the connection is stored with the plugin\'s token', $np_conn );
 global $wpdb;
-np_assert( 'off' === $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM $wpdb->options WHERE option_name = %s", NanoPost_Email_Check_Connection::OPTION ) ) || 'no' === $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM $wpdb->options WHERE option_name = %s", NanoPost_Email_Check_Connection::OPTION ) ), 'exchange: the token is not autoloaded' );
-np_assert( false !== wp_next_scheduled( NanoPost_Email_Check_App::SYNC_HOOK ), 'exchange: the site settings call is booked in WP-Cron' );
-np_assert( ! isset( NanoPost_Email_Check_Webhook::state()['last_status']['wp_mail'] ), 'exchange: the webhook state for wp_mail is reset' );
+np_assert( in_array( $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM $wpdb->options WHERE option_name = %s", NanoPost_Email_Check_Connection::OPTION ) ), array( 'off', 'no' ), true ), 'connect: the token is not autoloaded' );
+np_assert( 'unconfirmed' === NanoPost_Email_Check_Canary::block()['watching'], 'connect: the block of the answer is stored' );
+$np_body = NanoPost_Email_Check_App::site_body();
+np_assert( md5( (string) wp_json_encode( $np_body ) ) === $np_conn['site_hash'] && null === NanoPost_Email_Check_App::sync_site() && array() === np_app_take(), 'connect: the answer sets the site settings hash, so no PUT /site follows' );
+np_assert( ! isset( NanoPost_Email_Check_Webhook::state()['last_status']['wp_mail'] ), 'connect: the webhook state for wp_mail is reset' );
+$np = NanoPost_Email_Check_App::connect( 'owner@example.com' );
+np_assert( ! $np['ok'] && 'connected' === $np['error'] && array() === np_app_take(), 'connect while connected: no call' );
+
+// A lost answer: the retry sends the same token.
+np_reset();
+np_app_answer( 0 );
+$np = NanoPost_Email_Check_App::connect( 'owner@example.com' );
+np_assert( ! $np['ok'] && 'network' === $np['error'] && ! NanoPost_Email_Check_Connection::is_connected(), 'connect, network error: not connected', $np );
+$np_first = substr( np_app_take()[0]['headers']['Authorization'], 7 );
+NanoPost_Email_Check_App::connect( 'owner@example.com' );
+$np_second = substr( np_app_take()[0]['headers']['Authorization'], 7 );
+np_assert( $np_first === $np_second && NanoPost_Email_Check_Connection::is_connected(), 'retry after a lost answer: the same token, then connected' );
+np_reset();
+np_app_answer( 503 );
+NanoPost_Email_Check_App::connect( 'owner@example.com' );
+$np_first = substr( np_app_take()[0]['headers']['Authorization'], 7 );
+np_app_answer( 503 );
+NanoPost_Email_Check_App::connect( 'other@example.com' );
+$np_second = substr( np_app_take()[0]['headers']['Authorization'], 7 );
+np_assert( $np_first !== $np_second, 'another address: a new token (the same token with another address is refused by the app)' );
+np_reset();
+$np_t1 = NanoPost_Email_Check_Connection::begin( 'owner@example.com' );
+$np_t2 = NanoPost_Email_Check_Connection::begin( 'owner@example.com' );
+np_assert( '' !== $np_t1 && $np_t1 === $np_t2, 'two tabs at once: one token' );
 
 np_reset();
 np_app_answer(
-	400,
+	422,
 	array(
-		'error'   => 'invalid_code',
-		'message' => 'The code is wrong, used or expired.',
+		'error'   => 'invalid_request',
+		'message' => 'The alert_email field is not valid.',
 	)
 );
-$np = NanoPost_Email_Check_App::exchange( 'bad' );
-np_assert( ! $np['ok'] && 'invalid_code' === $np['error'] && 'The code is wrong, used or expired.' === $np['message'] && ! NanoPost_Email_Check_Connection::is_connected(), 'exchange 400: invalid_code, not connected', $np );
-np_app_answer( 200, array( 'check_id' => 'x' ) );
-$np = NanoPost_Email_Check_App::exchange( 'odd' );
-np_assert( ! $np['ok'] && 'bad_answer' === $np['error'] && ! NanoPost_Email_Check_Connection::is_connected(), 'exchange 200 without a token: refused, not connected', $np );
+$np = NanoPost_Email_Check_App::connect( 'owner@example.com' );
+np_assert( ! $np['ok'] && 'invalid_request' === $np['error'] && 'The alert_email field is not valid.' === $np['message'] && ! NanoPost_Email_Check_Connection::is_connected(), 'connect 422: the message, not connected', $np );
+np_app_answer( 201, array( 'check_url' => 'x' ) );
+$np = NanoPost_Email_Check_App::connect( 'owner@example.com' );
+np_assert( ! $np['ok'] && 'bad_answer' === $np['error'] && ! NanoPost_Email_Check_Connection::is_connected(), 'connect 201 with no canary address: refused, not connected', $np );
 np_app_answer(
-	200,
-	array(
-		'token'   => 't',
-		'address' => 'not an address',
-	)
+	429,
+	array( 'error' => 'rate_limited' ),
+	array( 'retry-after' => '120' )
 );
-$np = NanoPost_Email_Check_App::exchange( 'odd' );
-np_assert( ! $np['ok'] && ! NanoPost_Email_Check_Connection::is_connected(), 'exchange 200 with a bad address: refused' );
-np_app_answer( 0 );
-$np = NanoPost_Email_Check_App::exchange( 'x' );
-np_assert( ! $np['ok'] && 'network' === $np['error'] && 0 === $np['code'], 'exchange network error: not connected', $np );
-np_assert( 4 === count( NanoPost_Email_Check_App::failed_calls() ), 'failed calls are logged', NanoPost_Email_Check_App::failed_calls() );
+NanoPost_Email_Check_App::connect( 'owner@example.com' );
+np_app_take();
+$np = NanoPost_Email_Check_App::connect( 'owner@example.com' );
+np_assert( ! $np['ok'] && 'waiting' === $np['error'] && array() === np_app_take(), 'connect 429: no call until Retry-After, the pending token stays', $np );
+np_assert( 3 <= count( NanoPost_Email_Check_App::failed_calls() ), 'failed calls are logged', NanoPost_Email_Check_App::failed_calls() );
 np_app_take();
 
 // ---------------------------------------------------------------------------------------
@@ -465,7 +521,7 @@ np_app_take();
 $np       = NanoPost_Email_Check_App::sync_site();
 $np_calls = np_app_take();
 np_assert( $np['ok'] && 1 === count( $np_calls ) && 'PUT' === $np_calls[0]['method'] && '/site' === $np_calls[0]['path'] && 10 === $np_calls[0]['timeout'], 'site settings: PUT /site, 10 seconds', $np_calls );
-np_assert( array( 'site_url', 'plugin_version', 'wp_version', 'php_version', 'interval', 'webhook_url' ) === array_keys( $np_calls[0]['body'] ), 'site settings: exactly the contract fields', $np_calls[0]['body'] );
+np_assert( array( 'site_url', 'plugin_version', 'wp_version', 'php_version', 'interval', 'webhook_url', 'timezone' ) === array_keys( $np_calls[0]['body'] ), 'site settings: exactly the contract fields', $np_calls[0]['body'] );
 np_assert( 'weekly' === $np_calls[0]['body']['interval'] && null === $np_calls[0]['body']['webhook_url'] && PHP_VERSION === $np_calls[0]['body']['php_version'], 'site settings: interval, no webhook as null, PHP version', $np_calls[0]['body'] );
 np_assert( null === NanoPost_Email_Check_App::sync_site() && array() === np_app_take(), 'site settings: unchanged, no second call' );
 update_option( NanoPost_Email_Check_Settings::OPTION, array( 'interval' => 'daily' ) );
@@ -495,82 +551,244 @@ np_section( 'App: screen and handlers' );
 np_reset();
 wp_set_current_user( $np_admin_id );
 $np_x = np_xpath( np_render_screen() );
-np_assert( 1 === $np_x->query( '//div[@id="nanopost-email-check-connection"]//input[@name="action" and @value="nanopost_email_check_connect"]' )->length, 'not connected: a Connect form' );
+np_assert( 1 === $np_x->query( '//div[@id="nanopost-email-check-connection"]//input[@name="action" and @value="nanopost_email_check_turn_on"]' )->length, 'off: a "Turn on Email Canary" form' );
+np_assert( wp_get_current_user()->user_email === $np_x->query( '//input[@id="nanopost_email_check_alert_email"]' )->item( 0 )->getAttribute( 'value' ), 'off: the alert address is the logged-in user\'s email' );
 $np_text = $np_x->query( '//div[@id="nanopost-email-check-connection"]' )->item( 0 )->textContent;
-foreach ( array( 'site address', 'address of its admin area', 'plugin, WordPress and PHP', 'check interval', 'webhook URL', 'ID, the time, what started it', 'wp_mail() succeeded', 'error text', '30 days', 'Nothing is sent before you connect' ) as $np_part ) {
+foreach ( array( 'the site address', 'the alert address above', 'time zone', 'test interval', 'webhook URL', 'plugin, WordPress and PHP', 'test ID, the time, how the test started', 'whether WordPress accepted the email', 'error text', '30 days' ) as $np_part ) {
 	np_assert( false !== strpos( $np_text, $np_part ), 'consent text names: ' . $np_part );
 }
 np_assert( 1 === $np_x->query( '//a[@href="' . NanoPost_Email_Check_Help::TERMS_URL . '"]' )->length && 1 === $np_x->query( '//a[@href="' . NanoPost_Email_Check_Help::PRIVACY_URL . '"]' )->length, 'consent: terms and privacy links' );
+np_assert( 1 === $np_x->query( '//a[contains(@href,"/email-check-plugin/canary/") and contains(@href,"#what-is-sent-to-nanopost")]' )->length, 'consent: the "What is sent to nanoPost" link' );
+$np_public = static function () {
+	return 'http://localhost:8888';
+};
+add_filter( 'home_url', $np_public );
+np_assert( ! NanoPost_Email_Check_Admin::site_is_public() && false !== strpos( np_render_screen(), 'This site address is not public.' ), 'a local site address: a warning' );
+remove_filter( 'home_url', $np_public );
+foreach ( array( 'http://shop.test', 'http://192.168.1.5', 'http://[::1]', 'http://wp.local' ) as $np_u ) {
+	$np_public = static function () use ( $np_u ) {
+		return $np_u;
+	};
+	add_filter( 'home_url', $np_public );
+	np_assert( ! NanoPost_Email_Check_Admin::site_is_public(), 'not public: ' . $np_u );
+	remove_filter( 'home_url', $np_public );
+}
 
-// Connect: an editor is refused; the admin is sent to the app with a state.
+$np_post   = static function ( $handler, $action, $post = array() ) {
+	$_POST = $post;
+	np_nonce( wp_create_nonce( $action ) );
+	$out = np_outcome( array( 'NanoPost_Email_Check_Admin', $handler ) );
+	np_nonce( null );
+	$_POST = array();
+	return $out;
+};
+$np_notice = static function () use ( $np_admin_id ) {
+	$n = get_transient( 'nanopost_email_check_sent_' . $np_admin_id );
+	delete_transient( 'nanopost_email_check_sent_' . $np_admin_id );
+	return is_array( $n ) ? $n['outcome'] : $n;
+};
+
+// Turn on: an editor and a missing nonce are refused; a bad address makes no call.
 wp_set_current_user( $np_editor_id );
-np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::CONNECT_ACTION ) );
-np_assert( 'die:403' === np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) ), 'connect: an editor is refused' );
+np_assert( 'die:403' === $np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'a@example.com' ) ), 'turn on: an editor is refused' );
 wp_set_current_user( $np_admin_id );
-np_nonce( null );
-np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) ), 'die:' ), 'connect: no nonce is refused' );
-np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::CONNECT_ACTION ) );
-$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) );
-np_assert( 0 === strpos( $np_out, 'redirect:' . $np_app_page ), 'connect: redirect to the app connect page', $np_out );
-parse_str( (string) wp_parse_url( substr( $np_out, 9 ), PHP_URL_QUERY ), $np_q );
-$np_state = get_transient( NanoPost_Email_Check_Admin::STATE_PREFIX . $np_admin_id );
-np_assert( is_string( $np_state ) && 32 === strlen( $np_state ) && $np_state === $np_q['state'], 'connect: a 32-character state is stored for the user and sent', $np_q );
-np_assert( 0 === strpos( $np_q['return'], admin_url( 'admin-post.php' ) ) && false !== strpos( $np_q['return'], 'action=nanopost_email_check_connect_return' ) && home_url() === $np_q['site'], 'connect: return is the admin-post action, site is home_url', $np_q );
-np_app_take();
+$_POST = array( 'alert_email' => 'a@example.com' );
+np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_turn_on' ) ), 'die:' ), 'turn on: no nonce is refused' );
+$_POST = array();
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'not an address' ) );
+np_assert( array() === np_app_take() && 'canary-email' === $np_notice(), 'turn on: a bad address makes no call' );
 
-// Return with a wrong state: no exchange.
-$_GET   = array(
-	'state' => 'wrong',
-	'code'  => 'code-1',
-);
-$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) );
-np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ) && array() === np_app_take() && ! NanoPost_Email_Check_Connection::is_connected(), 'return: a wrong state makes no call and does not connect' );
-np_assert( array( 'outcome' => 'connect-state' ) === get_transient( 'nanopost_email_check_sent_' . $np_admin_id ), 'return: the state notice' );
-np_assert( false === get_transient( NanoPost_Email_Check_Admin::STATE_PREFIX . $np_admin_id ), 'return: the state is used up, also on a mismatch' );
-
-// Cancel in nanoPost: the right state, error=cancelled, no code: no call, no notice.
-delete_transient( 'nanopost_email_check_sent_' . $np_admin_id );
-np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::CONNECT_ACTION ) );
-$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) );
-parse_str( (string) wp_parse_url( substr( $np_out, 9 ), PHP_URL_QUERY ), $np_q );
-$_GET   = array(
-	'action' => 'nanopost_email_check_connect_return',
-	'error'  => 'cancelled',
-	'state'  => $np_q['state'],
-);
-$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) );
-np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ) && array() === np_app_take() && ! NanoPost_Email_Check_Connection::is_connected(), 'cancel: back to the screen, no call, not connected', $np_out );
-np_assert( false === get_transient( 'nanopost_email_check_sent_' . $np_admin_id ), 'cancel: no notice, as if nothing happened' );
-np_assert( false === get_transient( NanoPost_Email_Check_Admin::STATE_PREFIX . $np_admin_id ), 'cancel: the state is used up' );
-$_GET = array(
-	'error' => 'cancelled',
-	'state' => 'stale',
-);
-np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) );
-np_assert( array( 'outcome' => 'connect-state' ) === get_transient( 'nanopost_email_check_sent_' . $np_admin_id ), 'cancel with a bad state: the usual "request expired" notice' );
-
-// Return with the right state.
-np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::CONNECT_ACTION ) );
-$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect' ) );
-parse_str( (string) wp_parse_url( substr( $np_out, 9 ), PHP_URL_QUERY ), $np_q );
-$_GET   = array(
-	'state' => $np_q['state'],
-	'code'  => 'code-1',
-);
-$np_out = np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) );
-np_assert( NanoPost_Email_Check_Connection::is_connected() && 1 === count( np_app_take() ), 'return: the right state exchanges the code and connects' );
+// Turn on: POST /connect, then a test at once, with the proof.
+add_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+$np_out   = $np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'owner@example.com' ) );
+$np_calls = np_app_take();
+np_assert( 0 === strpos( $np_out, 'redirect:' . NanoPost_Email_Check_Admin::page_url() ) && 'canary-on' === get_transient( 'nanopost_email_check_sent_' . $np_admin_id )['outcome'], 'turn on: back to the screen, "turned on"', $np_out );
+np_assert( 2 === count( $np_calls ) && '/connect' === $np_calls[0]['path'] && '/announce' === $np_calls[1]['path'], 'turn on: POST /connect, then the first test is announced', wp_list_pluck( $np_calls, 'path' ) );
+np_assert( false !== strpos( NanoPost_Email_Check_Log::latest()->recipient, 'canary+abcd1234.' ), 'turn on: the first test goes to the canary address' );
 $np_x = np_xpath( np_render_screen() );
-np_assert( false !== strpos( $np_x->query( '//div[contains(@class,"notice-success")]' )->item( 0 )->textContent, 'connected to nanoPost' ), 'return: the "connected" notice' );
-np_assert( 1 === $np_x->query( '//input[@name="action" and @value="nanopost_email_check_disconnect"]' )->length, 'connected: a Disconnect form' );
-np_assert( 1 === $np_x->query( '//a[@href="https://app.example/checks/01JE"]' )->length, 'connected: a link to the check' );
-np_assert( 1 === $np_x->query( '//p[contains(@class,"nanopost-email-check-connected-note")]' )->length, 'connected: the recipient field says tests go to nanoPost' );
-$_GET = array(
-	'state' => $np_q['state'],
-	'code'  => 'code-1',
-);
-np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) );
-np_assert( array() === np_app_take(), 'return: the same state cannot be used twice' );
+np_assert( 1 === $np_x->query( '//div[@id="nanopost-email-check-proof"]' )->length, 'turn on: the proof box shows' );
+$np_area = $np_x->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
+np_assert( false !== strpos( $np_area, 'Alerts are OFF until you confirm.' ) && false !== strpos( $np_area, 'We sent an email to owner@example.com.' ), 'not confirmed: alerts are OFF, with the address', $np_area );
+np_assert( 1 === $np_x->query( '//form[contains(@class,"nanopost-email-check-resend")]' )->length && 1 === $np_x->query( '//details[contains(@class,"nanopost-email-check-change")]' )->length, 'not confirmed: Resend and Change' );
+np_assert( 1 === $np_x->query( '//input[@name="action" and @value="nanopost_email_check_turn_off"]' )->length, 'not confirmed: Turn off' );
+np_assert( 1 === $np_x->query( '//p[contains(@class,"nanopost-email-check-connected-note")]' )->length, 'on: the recipient field says it is not used' );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
 
+// Resend and Change.
+np_app_answer( 200, array( 'check' => np_app_block( 'unconfirmed', 'owner@example.com', 'pending' ) ) );
+$np_post( 'handle_alert_email', NanoPost_Email_Check_Admin::ALERT_EMAIL_ACTION, array( 'alert_email' => 'owner@example.com' ) );
+$np_calls = np_app_take();
+np_assert( 1 === count( $np_calls ) && 'PUT' === $np_calls[0]['method'] && '/alert-email' === $np_calls[0]['path'] && array( 'email' => 'owner@example.com' ) === $np_calls[0]['body'] && 5 === $np_calls[0]['timeout'], 'resend: PUT /alert-email with the same address, 5 seconds', $np_calls );
+np_assert( 'email-resent' === $np_notice(), 'resend: the notice' );
+np_app_answer( 200, array( 'check' => np_app_block( 'unconfirmed', 'new@example.com', 'pending' ) ) );
+$np_post( 'handle_alert_email', NanoPost_Email_Check_Admin::ALERT_EMAIL_ACTION, array( 'alert_email' => 'new@example.com' ) );
+np_app_take();
+np_assert( 'email-changed' === $np_notice() && 'new@example.com' === NanoPost_Email_Check_Connection::alert_email(), 'change: the notice, the address is kept' );
+$np_lim                 = np_app_block( 'unconfirmed', 'new@example.com', 'pending' );
+$np_lim['confirm_mail'] = array(
+	'state'           => 'limited',
+	'next_allowed_at' => gmdate( 'Y-m-d\TH:i:s\Z', time() + DAY_IN_SECONDS ),
+);
+np_app_answer( 200, array( 'check' => $np_lim ) );
+$np_post( 'handle_alert_email', NanoPost_Email_Check_Admin::ALERT_EMAIL_ACTION, array( 'alert_email' => 'new@example.com' ) );
+np_app_take();
+np_assert( 'email-limited' === $np_notice(), 'a limit stops the confirm email: "try again tomorrow"' );
+np_assert( false !== strpos( np_render_screen(), 'Try again tomorrow. Proof of arrival still works.' ), 'limited: the screen says it, with no Resend' );
+np_app_answer( 0 );
+$np_post( 'handle_alert_email', NanoPost_Email_Check_Admin::ALERT_EMAIL_ACTION, array( 'alert_email' => 'x@example.com' ) );
+np_app_take();
+np_assert( 'email-failed' === $np_notice() && 'new@example.com' === NanoPost_Email_Check_Connection::alert_email(), 'a failed change keeps the address' );
+
+// Turn off before the confirm: nothing is kept, so DELETE /connection.
+$np_post( 'handle_turn_off', NanoPost_Email_Check_Admin::TURN_OFF_ACTION );
+$np_calls = np_app_take();
+np_assert( 1 === count( $np_calls ) && 'DELETE' === $np_calls[0]['method'] && ! NanoPost_Email_Check_Connection::is_connected() && 'canary-off' === $np_notice(), 'turn off while not confirmed: DELETE /connection, off', $np_calls );
+
+// On: Turn off is a stop that keeps the token.
+np_app_connect();
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) ) );
+$np_area = np_xpath( np_render_screen() )->query( '//div[@id="nanopost-email-check-canary"]' )->item( 0 )->textContent;
+np_assert( false !== strpos( $np_area, 'Email Canary is on' ) && false !== strpos( $np_area, 'owner@example.com' ) && false !== strpos( $np_area, 'Webhook' ), 'on: the state, the alert address in full, the webhook', $np_area );
+np_assert( false === strpos( np_render_screen(), 'canary+k7f3q9x2' ), 'the screen never shows the canary address' );
+np_app_answer( 0 );
+$np_post( 'handle_turn_off', NanoPost_Email_Check_Admin::TURN_OFF_ACTION );
+np_app_take();
+np_assert( 'canary-off-failed' === $np_notice() && NanoPost_Email_Check_Connection::canary_active(), 'turn off, nanoPost not reached: still on, says so' );
+np_app_answer( 200, array( 'check' => np_app_block( 'stopped', 'owner@example.com', 'confirmed', 'owner' ) ) );
+$np_post( 'handle_turn_off', NanoPost_Email_Check_Admin::TURN_OFF_ACTION );
+$np_calls = np_app_take();
+np_assert( 1 === count( $np_calls ) && 'POST' === $np_calls[0]['method'] && '/stop' === $np_calls[0]['path'] && array( 'trigger' => 'turn_off' ) === $np_calls[0]['body'], 'turn off: POST /stop with trigger turn_off', $np_calls );
+np_assert( 'canary-off' === $np_notice() && NanoPost_Email_Check_Connection::is_connected() && ! NanoPost_Email_Check_Connection::canary_active(), 'turn off: the token is kept, Email Canary is off' );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_r = NanoPost_Email_Check_Plugin::run_checks( 'scheduled' )[0];
+remove_filter( 'pre_wp_mail', '__return_true' );
+np_assert( array() === np_app_take() && '' === $np_r->test_id && false === strpos( $np_r->recipient, 'canary' ), 'off: the test goes to the recipient setting, no call' );
+np_assert( null === NanoPost_Email_Check_App::sync_site() && array() === np_app_take(), 'off: no site settings call' );
+$np_x = np_xpath( np_render_screen() );
+np_assert( 1 === $np_x->query( '//div[@id="nanopost-email-check-canary"]//input[@name="action" and @value="nanopost_email_check_turn_on"]' )->length && 'owner@example.com' === $np_x->query( '//input[@id="nanopost_email_check_alert_email"]' )->item( 0 )->getAttribute( 'value' ), 'off: "Turn on" with the alert address' );
+
+// Turn on again with the same address: POST /start, no new confirm.
+np_app_answer( 200, array( 'check' => np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'owner@example.com' ) );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+$np_calls = np_app_take();
+np_assert( '/start' === $np_calls[0]['path'] && array( 'trigger' => 'turn_on' ) === $np_calls[0]['body'] && '/announce' === $np_calls[1]['path'], 'turn on, same address: POST /start (turn_on), then a test', wp_list_pluck( $np_calls, 'path' ) );
+np_assert( 'canary-on-again' === $np_notice() && NanoPost_Email_Check_Connection::canary_active(), 'turn on again: on' );
+
+// A click that timed out here but reached the app: the next "Turn on" is a plain start.
+$np_conn_before = NanoPost_Email_Check_Connection::get();
+np_app_answer( 0 );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'owner@example.com' ) );
+np_app_take();
+np_assert( 'canary-failed' === $np_notice() && NanoPost_Email_Check_Connection::get() === $np_conn_before, 'turn on, start times out: nothing changes here' );
+np_app_answer( 200, array( 'check' => np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'owner@example.com' ) );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+$np_calls = np_app_take();
+np_assert( '/start' === $np_calls[0]['path'] && ! in_array( '/connect', wp_list_pluck( $np_calls, 'path' ), true ) && 'tok-123' === NanoPost_Email_Check_Connection::get()['token'], 'turn on while it already watches: POST /start again, never POST /connect, the token stays', wp_list_pluck( $np_calls, 'path' ) );
+np_assert( 'canary-on-again' === $np_notice(), 'then: on' );
+
+// After a Change, the canary has a confirmed and a pending address: both start it again.
+$np_two                = np_app_block( 'stopped', 'owner@example.com', 'confirmed', 'owner' );
+$np_two['alerts_to'][] = array(
+	'email' => 'next@example.com',
+	'state' => 'pending',
+);
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( $np_two ) ) );
+np_assert( 'owner@example.com' === np_xpath( np_render_screen() )->query( '//input[@id="nanopost_email_check_alert_email"]' )->item( 0 )->getAttribute( 'value' ), 'off after a Change: the field shows the confirmed address' );
+foreach ( array( 'Owner@Example.com', 'next@example.com' ) as $np_addr ) {
+	update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( $np_two ) ) );
+	np_app_answer( 200, array( 'check' => np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) );
+	add_filter( 'pre_wp_mail', '__return_true' );
+	$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => $np_addr ) );
+	remove_filter( 'pre_wp_mail', '__return_true' );
+	delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+	$np_calls = np_app_take();
+	np_assert( '/start' === $np_calls[0]['path'] && 'canary-on-again' === $np_notice(), 'turn on with ' . $np_addr . ' (one of the canary\'s addresses): POST /start', wp_list_pluck( $np_calls, 'path' ) );
+}
+
+// Stopped from a mail link: the next announce answers 409.
+$np_409 = array(
+	'error'   => 'canary_stopped',
+	'message' => 'Email Canary is off.',
+	'check'   => np_app_block( 'stopped', 'owner@example.com', 'confirmed', 'mail_link' ),
+);
+np_app_answer( 409, $np_409 );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_r = NanoPost_Email_Check_Plugin::run_checks( 'scheduled' )[0];
+remove_filter( 'pre_wp_mail', '__return_true' );
+np_app_take();
+np_assert( NanoPost_Email_Check_Result::ANNOUNCE_UNWATCHED === $np_r->announce && ! NanoPost_Email_Check_Connection::canary_active(), 'announce 409: "unwatched", and Email Canary is off here too' );
+np_assert( false !== strpos( np_render_screen(), 'Email Canary is off (asked for by email).' ), 'off by mail link: the screen says why' );
+
+// Turn on with another address: DELETE the old one, then a new canary.
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'right@example.com' ) );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+$np_calls = np_app_take();
+np_assert( 'DELETE' === $np_calls[0]['method'] && 'Bearer tok-123' === $np_calls[0]['headers']['Authorization'] && '/connect' === $np_calls[1]['path'] && 'Bearer tok-123' !== $np_calls[1]['headers']['Authorization'], 'turn on, another address: DELETE the old canary, then POST /connect with a new token', wp_list_pluck( $np_calls, 'path' ) );
+
+// Not confirmed in 24 hours: "Turn on" is POST /connect again, with the same token.
+$np_tok = NanoPost_Email_Check_Connection::get()['token'];
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'stopped', 'right@example.com', 'pending', 'not_confirmed' ) ) ) );
+np_assert( false !== strpos( np_render_screen(), 'right@example.com was not confirmed.' ), 'not confirmed in time: the screen says so' );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'right@example.com' ) );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+$np_calls = np_app_take();
+np_assert( '/connect' === $np_calls[0]['path'] && 'Bearer ' . $np_tok === $np_calls[0]['headers']['Authorization'], 'turn on after not_confirmed: POST /connect with the same token', $np_calls[0] );
+
+// Turn on again with no room: POST /start answers over_limit (24 hours of proof).
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'stopped', 'right@example.com', 'confirmed', 'owner' ) ) ) );
+np_app_answer( 200, array( 'check' => np_app_block( 'over_limit', 'right@example.com', 'confirmed' ) ) );
+add_filter( 'pre_wp_mail', '__return_true' );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'right@example.com' ) );
+remove_filter( 'pre_wp_mail', '__return_true' );
+delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
+np_app_take();
+np_assert( 'canary-over-limit' === $np_notice(), 'turn on, no room: the notice says alerts are off (limit), not "on again"' );
+
+// Over the limit, then stopped: POST /start when the account has room.
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'stopped', 'right@example.com', 'confirmed', 'over_limit' ) ) ) );
+np_app_answer( 409, array_merge( $np_409, array( 'check' => np_app_block( 'stopped', 'right@example.com', 'confirmed', 'over_limit' ) ) ) );
+$np_post( 'handle_turn_on', NanoPost_Email_Check_Admin::TURN_ON_ACTION, array( 'alert_email' => 'right@example.com' ) );
+$np_calls = np_app_take();
+np_assert( 1 === count( $np_calls ) && '/start' === $np_calls[0]['path'] && 'canary-still-off' === $np_notice(), 'over the limit, no room: POST /start answers 409, still off, says so', $np_calls );
+wp_set_current_user( $np_admin_id );
+
+// Deactivate and activate.
+np_app_connect();
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) ) );
+np_app_take();
+np_app_answer( 200, array( 'check' => np_app_block( 'stopped', 'owner@example.com', 'confirmed', 'deactivated' ) ) );
+NanoPost_Email_Check_Scheduler::deactivate( false );
+$np_calls = np_app_take();
+np_assert( 1 === count( $np_calls ) && '/stop' === $np_calls[0]['path'] && array( 'trigger' => 'deactivate' ) === $np_calls[0]['body'], 'deactivate: POST /stop with trigger deactivate', $np_calls );
+np_assert( NanoPost_Email_Check_Connection::is_connected(), 'deactivate: the token is kept' );
+NanoPost_Email_Check_Scheduler::activate( false );
+np_assert( array() === np_app_take() && false !== wp_next_scheduled( NanoPost_Email_Check_App::START_HOOK ), 'activate: no call in the request, "start" is booked in WP-Cron' );
+np_app_answer( 200, array( 'check' => np_app_block( 'on', 'owner@example.com', 'confirmed' ) ) );
+do_action( NanoPost_Email_Check_App::START_HOOK );
+$np_calls = np_app_take();
+np_assert( 1 === count( $np_calls ) && '/start' === $np_calls[0]['path'] && array( 'trigger' => 'activate' ) === $np_calls[0]['body'] && NanoPost_Email_Check_Connection::canary_active(), 'after activation: POST /start with trigger activate, on again', $np_calls );
+wp_clear_scheduled_hook( NanoPost_Email_Check_App::START_HOOK );
+update_option( NanoPost_Email_Check_Canary::OPTION, array( 'block' => NanoPost_Email_Check_Canary::normalize( np_app_block( 'unconfirmed', 'owner@example.com', 'pending' ) ) ) );
+NanoPost_Email_Check_Scheduler::deactivate( false );
+np_assert( array() === np_app_take(), 'deactivate while not confirmed: no call (the 24 hours run on)' );
+NanoPost_Email_Check_Scheduler::ensure_scheduled();
+// The old browser connect return just shows the screen.
+np_assert( 0 === strpos( np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_connect_return' ) ), 'redirect:' . NanoPost_Email_Check_Admin::page_url() ) && array() === np_app_take(), 'the 1.7 return URL: back to the screen, no call' );
+
+np_reset();
+np_app_connect();
 // Send test now while connected: proof of arrival box with the test ID.
 delete_transient( NanoPost_Email_Check_Admin::SEND_LOCK );
 add_filter( 'pre_wp_mail', '__return_true' );
@@ -654,11 +872,6 @@ np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::DISMISS_ENDED ) );
 np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_dismiss_ended' ) );
 np_assert( '' === NanoPost_Email_Check_Connection::ended_reason(), 'screen: "Reconnect" can be dismissed' );
 
-// Disconnect handler.
-np_app_connect();
-np_nonce( wp_create_nonce( NanoPost_Email_Check_Admin::DISCONNECT_ACTION ) );
-np_outcome( array( 'NanoPost_Email_Check_Admin', 'handle_disconnect' ) );
-np_assert( ! NanoPost_Email_Check_Connection::is_connected() && 1 === count( np_app_take() ), 'disconnect handler: one call, disconnected' );
 wp_set_current_user( 0 );
 $_GET = array();
 np_nonce( null );
@@ -676,22 +889,18 @@ np_assert( false === strpos( wp_json_encode( $np_data ), 'tok-123' ), 'status: n
 NanoPost_Email_Check_Connection::wait( 300 );
 np_assert( 'waiting' === NanoPost_Email_Check_CLI::status_data()['nanopost']['calls'], 'status: waiting after a 429' );
 $np_rows = wp_list_pluck( NanoPost_Email_Check_CLI::status_rows( NanoPost_Email_Check_CLI::status_data() ), 'value', 'field' );
-np_assert( isset( $np_rows['nanoPost'] ) && false !== strpos( $np_rows['nanoPost'], 'Calls wait until' ), 'status table: the nanoPost row', $np_rows );
+np_assert( isset( $np_rows['Email Canary'] ) && false !== strpos( $np_rows['Email Canary'], 'Calls wait until' ), 'status table: the Email Canary row', $np_rows );
 
 np_app_connect();
 add_filter( 'pre_wp_mail', '__return_true' );
 $np_out = np_cli( 'run' );
-np_assert( 0 === $np_out->return_code && false !== strpos( $np_out->stdout, 'accepted the test email for nanoPost (test ' ) && false !== strpos( $np_out->stdout, 'https://app.example/checks/01JD' ), 'wp email-check run while connected: names nanoPost, the test ID and the check URL', $np_out );
-np_assert( false !== strpos( $np_out->stdout, 'Sending a test email to nanoPost ...' ) && false === strpos( $np_out->stdout, 'owner@' ), 'wp email-check run while connected: does not name the recipient setting', $np_out );
+np_assert( 0 === $np_out->return_code && false !== strpos( $np_out->stdout, 'accepted the test email for Email Canary (test ' ) && false !== strpos( $np_out->stdout, 'https://app.example/checks/01JD' ), 'wp email-check run while connected: names nanoPost, the test ID and the check URL', $np_out );
+np_assert( false !== strpos( $np_out->stdout, 'Sending a test email to Email Canary ...' ) && false === strpos( $np_out->stdout, 'owner@' ), 'wp email-check run while connected: does not name the recipient setting', $np_out );
 np_app_answer( 503 );
 $np_out = np_cli( 'run' );
-np_assert( 0 === $np_out->return_code && false !== strpos( $np_out->stderr, 'could not tell nanoPost' ), 'wp email-check run: a warning when the announce call failed', $np_out );
+np_assert( 0 === $np_out->return_code && false !== strpos( $np_out->stderr, 'could not tell Email Canary' ), 'wp email-check run: a warning when the announce call failed', $np_out );
 remove_filter( 'pre_wp_mail', '__return_true' );
 np_app_take();
 np_reset();
 
 // ---------------------------------------------------------------------------------------
-np_section( 'App: uninstall tells nanoPost' );
-np_reset();
-np_app_connect();
-np_app_take();

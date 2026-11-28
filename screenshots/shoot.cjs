@@ -33,10 +33,11 @@ function wp(command) {
 async function login(browser) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(`${base}/wp-login.php`);
+  // Log in straight to the plugin screen: the Dashboard can be slow to load.
+  await page.goto(`${base}/wp-login.php?redirect_to=${encodeURIComponent(`${base}/wp-admin/tools.php?page=nanopost-email-check`)}`);
   await page.fill('#user_login', user);
   await page.fill('#user_pass', pass);
-  await Promise.all([page.waitForNavigation(), page.click('#wp-submit')]);
+  await Promise.all([page.waitForURL(/\/wp-admin\//, { timeout: 90000 }), page.click('#wp-submit')]);
   if (!page.url().includes('/wp-admin')) throw new Error('Login failed. Set SHOT_USER and SHOT_PASSWORD.');
   const file = path.join(os.tmpdir(), `nanopost-email-check-shots-${process.pid}.json`);
   await context.storageState({ path: file });
@@ -55,6 +56,8 @@ async function shoot(browser, state, shot) {
   const page = await context.newPage();
   // URL patterns to refuse, for example a script that would call a real service.
   for (const pattern of s.block || []) await page.route(pattern, (route) => route.abort());
+  // Nothing from other hosts (avatars, news feeds): it only slows the page load.
+  if (!s.html) await page.route((url) => /^https?:$/.test(url.protocol) && url.origin !== new URL(base).origin, (route) => route.abort());
   if (s.html) {
     // A local page, not the site. "data" is a WP-CLI command that prints JSON for it.
     if (s.data) await page.addInitScript((d) => { window.shotData = d; }, JSON.parse(wp(s.data)));

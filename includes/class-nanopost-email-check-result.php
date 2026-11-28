@@ -27,6 +27,12 @@ class NanoPost_Email_Check_Result {
 	const ANNOUNCE_ENDED  = 'ended';
 
 	/**
+	 * The app took the announce call, but Email Canary does not watch (not confirmed,
+	 * stopped, over the limit), so it sends no alert. The plugin's own webhook alerts.
+	 */
+	const ANNOUNCE_UNWATCHED = 'unwatched';
+
+	/**
 	 * Check id, from NanoPost_Email_Check_Check::id().
 	 *
 	 * @var string
@@ -87,11 +93,21 @@ class NanoPost_Email_Check_Result {
 	/**
 	 * Whether nanoPost took the announce call for this test: ANNOUNCE_OK, ANNOUNCE_FAILED,
 	 * ANNOUNCE_ENDED (nanoPost answered 401: the connection had ended, for example the
-	 * owner disconnected the site in nanoPost), or '' when no call was due (not connected).
+	 * owner disconnected the site in nanoPost), ANNOUNCE_UNWATCHED, or '' when no call was
+	 * due (not connected).
 	 *
 	 * @var string
 	 */
 	public $announce = '';
+
+	/**
+	 * What Email Canary said about this test: arrival, arrived_at, spf, dkim, dmarc,
+	 * reason, help_url, fetched_at (see NanoPost_Email_Check_Canary::normalize_test()).
+	 * Empty until the plugin asked.
+	 *
+	 * @var array
+	 */
+	public $canary = array();
 
 	/**
 	 * Constructor.
@@ -167,6 +183,7 @@ class NanoPost_Email_Check_Result {
 			'mailer'    => $this->mailer,
 			'test_id'   => $this->test_id,
 			'announce'  => $this->announce,
+			'canary'    => $this->canary,
 		);
 	}
 
@@ -189,12 +206,14 @@ class NanoPost_Email_Check_Result {
 				'mailer'    => array(),
 				'test_id'   => '',
 				'announce'  => '',
+				'canary'    => array(),
 			)
 		);
 
 		$result           = new self( $data['check'], $data['trigger'], $data['passed'], $data['error'], $data['recipient'], $data['time'], $data['mailer'] );
 		$result->test_id  = is_string( $data['test_id'] ) && preg_match( '/^[a-z0-9]{12}$/', $data['test_id'] ) ? $data['test_id'] : '';
-		$result->announce = in_array( $data['announce'], array( self::ANNOUNCE_OK, self::ANNOUNCE_FAILED, self::ANNOUNCE_ENDED ), true ) ? $data['announce'] : '';
+		$result->announce = in_array( $data['announce'], array( self::ANNOUNCE_OK, self::ANNOUNCE_FAILED, self::ANNOUNCE_ENDED, self::ANNOUNCE_UNWATCHED ), true ) ? $data['announce'] : '';
+		$result->canary   = is_array( $data['canary'] ) ? $data['canary'] : array();
 		return $result;
 	}
 }
